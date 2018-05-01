@@ -1,0 +1,29 @@
+{
+  "name": "watchdog-proxy",
+  "version": "0.0.1",
+  "description": "Rate limiting proxy for watchdog requests",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "remove": "serverless remove",
+    "logs": "serverless logs",
+    "watch": "onchange -v \"functions/*.js\" \"lib/*.js\" -- npm run deploy"
+  },
+  "homepage": "https://github.com/mozilla/watchdog-proxy/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mozilla/watchdog-proxy.git"
+  },
+  "author": "Les Orchard <me@lmorchard.com>",
+  "license": "MPL-2.0",
+  "devDependencies": {
+    "aws-sdk": "^2.224.1",
+    "onchange": "^3.3.0",
+    "serverless": "^1.8.0",
+    "serverless-s3-remover": "^0.4.1",
+    "serverless-sqs-alarms-plugin": "^0.0.2"
+  },
+  "dependencies": {
+    "request": "^2.85.0",
+    "request-promise-native": "^1.0.5"
+  }
+}

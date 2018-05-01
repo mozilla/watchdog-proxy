@@ -1,0 +1,148 @@
+service: watchdog-proxy
+
+plugins:
+  - serverless-s3-remover
+
+custom:
+  region: ${self:provider.region}
+  stage: ${opt:stage, self:provider.stage}
+  prefix: ${self:service}-${self:custom.stage}
+  process: ${self:custom.prefix}-processQueueItem
+  config: ${self:custom.prefix}-config
+  sns: ${self:custom.prefix}-trigger
+  sqs: ${self:custom.prefix}-messages
+  contentBucket: ${self:custom.prefix}-content
+  remover:
+    buckets:
+      - ${self:custom.contentBucket}
+
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: dev
+  region: us-east-1
+  memorySize: 128
+  iamRoleStatements:
+  - Effect: Allow
+    Action:
+      - dynamodb:GetItem
+      - dynamodb:PutItem
+      - dynamodb:DeleteItem
+      - dynamodb:UpdateItem
+      - dynamodb:Query
+      - dynamodb:Scan
+    Resource:
+      - arn:aws:dynamodb:*:*:table/${self:custom.config}
+  - Effect: Allow
+    Action:
+      - lambda:InvokeFunction
+    Resource: arn:aws:lambda:*:*:function:${self:custom.process}
+  - Effect: Allow
+    Action:
+      - sqs:ChangeMessageVisibility
+      - sqs:ChangeMessageVisibilityBatch
+      - sqs:DeleteMessage
+      - sqs:DeleteMessageBatch
+      - sqs:GetQueueAttributes
+      - sqs:GetQueueUrl
+      - sqs:ReceiveMessage
+      - sqs:SendMessage
+      - sqs:SendMessageBatch
+    Resource: arn:aws:sqs:*:*:${self:custom.sqs}
+  - Effect: Allow
+    Action:
+      - s3:GetObject
+      - s3:PutObject
+      - s3:PutObjectAcl
+      - s3:DeleteObject
+      - s3:ListBucket
+    Resource:
+      - arn:aws:s3:::${self:custom.contentBucket}
+      - arn:aws:s3:::${self:custom.contentBucket}/*
+
+resources:
+  Resources:
+
+    S3BucketContent:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.contentBucket}
+        LifecycleConfiguration:
+          Rules:
+            - Id: DailyCleanup
+              Status: Enabled
+              ExpirationInDays: 1
+
+    Messages:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.sqs}
+        MessageRetentionPeriod: 1209600
+        VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+            - MessagesDeadLetterQueue
+            - Arn
+          maxReceiveCount: 10
+
+    MessagesDeadLetterQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.sqs}-dead-letter-queue
+        MessageRetentionPeriod: 1209600
+
+    Config:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.config}
+        AttributeDefinitions:
+          - AttributeName: key
+            AttributeType: S
+        KeySchema:
+          - AttributeName: key
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+package:
+  exclude:
+    - docs/**
+    - helpers/**
+    - test/**
+
+functions:
+
+  accept:
+    handler: functions/accept.handler
+    name: ${self:custom.prefix}-accept
+    environment:
+      CONFIG_TABLE: ${self:custom.config}
+      QUEUE_NAME: ${self:custom.sqs}
+      CONTENT_BUCKET: ${self:custom.contentBucket}
+    events:
+      - http:
+          path: accept
+          method: get
+
+  pollQueue:
+    timeout: 60
+    handler: functions/pollQueue.handler
+    name: ${self:custom.prefix}-pollQueue
+    environment:
+      CONFIG_TABLE: ${self:custom.config}
+      QUEUE_NAME: ${self:custom.sqs}
+      CONTENT_BUCKET: ${self:custom.contentBucket}
+      PROCESS_QUEUE_FUNCTION: ${self:custom.process}
+    events:
+      - schedule: rate(1 minute)
+  
+  processQueueItem:
+    timeout: 60
+    handler: functions/processQueueItem.handler
+    name: ${self:custom.process}
+    environment:
+      CONFIG_TABLE: ${self:custom.config}
+      QUEUE_NAME: ${self:custom.sqs}
+      CONTENT_BUCKET: ${self:custom.contentBucket}
