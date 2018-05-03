@@ -56,7 +56,7 @@ functions:
 
 If everything was successful, you should now have a running stack with an HTTPS resource to accept requests listed as one of the endpoints.
 
-To remove this stack from AWS and delete everything, run `./node_modules/.bin/serverless remove --stage <stage name>`
+To remove this stack from AWS and delete everything, run `npm run remove -- --stage <stage name>`
 
 The [Serverless docs on workflow are useful](https://serverless.com/framework/docs/providers/aws/guide/workflow/).
 
