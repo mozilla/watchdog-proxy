@@ -4,9 +4,13 @@
   "description": "Rate limiting proxy for watchdog requests",
   "scripts": {
     "deploy": "serverless deploy",
-    "remove": "serverless remove",
+    "lint": "eslint functions lib test",
     "logs": "serverless logs",
-    "watch": "onchange -v \"functions/*.js\" \"lib/*.js\" -- npm run deploy"
+    "remove": "serverless remove",
+    "test": "npm-run-all lint test:js",
+    "test:js": "mocha --recursive test",
+    "watch": "onchange -v -i \"{functions,lib,test}/**/*.js\" -- npm run test",
+    "watch:deploy": "onchange -v \"functions/*.js\" \"lib/*.js\" -- npm run deploy"
   },
   "homepage": "https://github.com/mozilla/watchdog-proxy/",
   "repository": {
@@ -17,10 +21,17 @@
   "license": "MPL-2.0",
   "devDependencies": {
     "aws-sdk": "^2.224.1",
+    "chai": "^4.1.2",
+    "eslint": "^4.19.1",
+    "eslint-plugin-mozilla": "^0.11.0",
+    "eslint-plugin-no-unsanitized": "^3.0.0",
+    "mocha": "^5.1.1",
+    "npm-run-all": "^4.1.2",
     "onchange": "^3.3.0",
     "serverless": "^1.8.0",
     "serverless-s3-remover": "^0.4.1",
-    "serverless-sqs-alarms-plugin": "^0.0.2"
+    "serverless-sqs-alarms-plugin": "^0.0.2",
+    "sinon": "^5.0.3"
   },
   "dependencies": {
     "request": "^2.85.0",

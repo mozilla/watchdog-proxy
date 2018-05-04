@@ -1,8 +1,16 @@
 # watchdog-proxy
 
+[![CircleCI](https://circleci.com/gh/mozilla/watchdog-proxy.svg?style=svg)](https://circleci.com/gh/mozilla/watchdog-proxy)
+
 ## Development
 
-### Quickstart Notes
+### Useful NPM scripts
+
+- `npm run lint` - check JS syntax & formatting
+- `npm run test` - run JS tests
+- `npm run watch` - start a file watcher that runs tests & lint
+
+### Quickstart Notes for Stackless on AWS
 
 Development is currently done directly on Amazon Web Services. So, you'll need to [sign up for an account](https://aws.amazon.com/) or [request a Dev IAM account from Mozilla Cloud Operations](https://mana.mozilla.org/wiki/display/SVCOPS/Requesting+A+Dev+IAM+account+from+Cloud+Operations). (The latter is available only to Mozillians.)
 
@@ -67,5 +75,5 @@ npm run logs -- --stage lmorchard -f accept -t
 
 # Deploy an individual function on file changes (double-double-dashes because
 shells are weird)
-npm run watch -- -- --stage lmorchard -f accept
+npm run watch:deploy -- -- --stage lmorchard -f accept
 ```
