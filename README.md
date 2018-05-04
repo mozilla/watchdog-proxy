@@ -9,6 +9,11 @@
 - `npm run lint` - check JS syntax & formatting
 - `npm run test` - run JS tests
 - `npm run watch` - start a file watcher that runs tests & lint
+- `npm run prettier` - clean up JS formatting
+- `npm run deploy:dev -- --stage lmorchard` - deploy a stack with stage `lmorchard` configured for development (e.g. with `ENABLE_DEV_AUTH=1`)
+- `npm run logs -- --stage lmorchard -f accept -t` - watch logs for the function `accept`
+- `npm run deploy -- --stage production` - deploy a stack with stage `production` configured for production
+- `npm run client -- [--id <id> --key <key>] <url>` - make an authenticated request to `<url>` using Hawk credentials, defaults to dev credentials devuser / devkey enabled with `ENABLE_DEV_AUTH` env var on deploy
 
 ### Quickstart Notes for Stackless on AWS
 
@@ -28,11 +33,13 @@ If you don't already have an AWS key ID and secret, [follow the guide to acquire
 
 Choose a unique stage name to use for development - e.g. mine is `lmorchard`. This is used in naming all the pieces of the stack you deploy, in order to distinguish them from any other stack.
 
-Try deploying the service to AWS: `npm run deploy -- --stage <stage name>`
+Try deploying the service to AWS:
+
+`npm run deploy:dev -- --stage <stage name>`
 
 You should see output like the following:
 ```
-$ npm run deploy -- --stage lmorchard
+$ npm run deploy:dev -- --stage lmorchard
 Serverless: Packaging service...
 Serverless: Excluding development dependencies...
 Serverless: Creating Stack...
@@ -67,13 +74,3 @@ If everything was successful, you should now have a running stack with an HTTPS 
 To remove this stack from AWS and delete everything, run `npm run remove -- --stage <stage name>`
 
 The [Serverless docs on workflow are useful](https://serverless.com/framework/docs/providers/aws/guide/workflow/).
-
-These are also a few useful example commands:
-```
-# Tail logs from lambda functions
-npm run logs -- --stage lmorchard -f accept -t
-
-# Deploy an individual function on file changes (double-double-dashes because
-shells are weird)
-npm run watch:deploy -- -- --stage lmorchard -f accept
-```

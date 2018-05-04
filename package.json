@@ -5,6 +5,7 @@
   "scripts": {
     "precommit": "lint-staged && npm run test:js",
     "deploy": "serverless deploy",
+    "deploy:dev": "cross-env-shell NODE_ENV=development ENABLE_DEV_AUTH=1 npm run deploy --",
     "lint": "npm-run-all lint:*",
     "lint:js": "eslint functions lib test",
     "prettier": "prettier --write \"{functions,lib,test}/**/*.js\"",
@@ -16,7 +17,8 @@
     "test:js": "mocha --recursive test",
     "watch": "npm-run-all --parallel watch:*",
     "watch:lint": "onchange -v -i \"{functions,lib,test}/**/*.js\" -- npm run lint",
-    "watch:test": "onchange -v -i \"{functions,lib,test}/**/*.js\" -- npm run test"
+    "watch:test": "onchange -v -i \"{functions,lib,test}/**/*.js\" -- npm run test",
+    "client": "node bin/client.js"
   },
   "lint-staged": {
     "*.js": [
@@ -34,6 +36,8 @@
   "devDependencies": {
     "aws-sdk": "2.234.1",
     "chai": "4.1.2",
+    "commander": "2.15.1",
+    "cross-env": "5.1.4",
     "eslint": "4.19.1",
     "eslint-plugin-mozilla": "0.11.0",
     "eslint-plugin-no-unsanitized": "3.0.0",
@@ -50,6 +54,7 @@
     "sinon": "5.0.7"
   },
   "dependencies": {
+    "hawk": "7.0.7",
     "request": "2.85.0",
     "request-promise-native": "1.0.5"
   }
