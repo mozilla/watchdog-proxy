@@ -20,7 +20,7 @@
   "author": "Les Orchard <me@lmorchard.com>",
   "license": "MPL-2.0",
   "devDependencies": {
-    "aws-sdk": "2.224.1",
+    "aws-sdk": "2.233.1",
     "chai": "4.1.2",
     "eslint": "4.19.1",
     "eslint-plugin-mozilla": "0.11.0",
