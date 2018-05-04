@@ -1,0 +1,23 @@
+extends:
+- eslint:recommended
+- plugin:mozilla/recommended
+
+env:
+  node: true
+  es6: true
+
+parserOptions:
+  ecmaVersion: 2017
+
+root: true
+
+rules:
+  no-console: off
+
+overrides:
+  -
+    files: ['test/**/*.js']
+    rules:
+      import/unambiguous: off
+    env:
+      mocha: true
