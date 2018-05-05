@@ -30,7 +30,7 @@
     "onchange": "3.3.0",
     "serverless": "1.26.1",
     "serverless-s3-remover": "0.4.1",
-    "serverless-sqs-alarms-plugin": "0.0.2",
+    "serverless-sqs-alarms-plugin": "0.1.7",
     "sinon": "5.0.3"
   },
   "dependencies": {
