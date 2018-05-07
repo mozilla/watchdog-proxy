@@ -31,7 +31,7 @@
     "serverless": "1.27.2",
     "serverless-s3-remover": "0.4.1",
     "serverless-sqs-alarms-plugin": "0.1.7",
-    "sinon": "5.0.6"
+    "sinon": "5.0.7"
   },
   "dependencies": {
     "request": "2.85.0",
