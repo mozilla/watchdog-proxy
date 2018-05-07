@@ -1,37 +1,43 @@
 "use strict";
 
 const Hawk = require("hawk");
+const Busboy = require("busboy");
 const AWS = require("aws-sdk");
 const S3 = new AWS.S3({ apiVersion: "2006-03-01" });
 const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const documentClient = new AWS.DynamoDB.DocumentClient();
 const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
 
+const REQUIRED_FIELDS = ["image", "negative_uri", "positive_uri"];
+
 module.exports.post = async function(event, context) {
-  const { NODE_ENV, QUEUE_NAME, CONTENT_BUCKET } = process.env;
+  const { QUEUE_NAME: QueueName, CONTENT_BUCKET: Bucket } = process.env;
+
   const {
     headers,
-    // body,
-    queryStringParameters,
+    queryStringParameters: params,
     requestContext: { path, requestId }
   } = event;
+
   const {
     Host: host,
     Authorization: authorization,
     "X-Forwarded-Port": port = 80
   } = headers;
 
-  const responseBody = { requestId, env: NODE_ENV };
-
+  let credentials;
   try {
-    responseBody.hawk = await authenticate({
-      method: "POST",
-      path,
-      queryStringParameters,
-      host,
-      port,
-      authorization
-    });
+    ({ credentials } = await Hawk.server.authenticate(
+      {
+        method: "POST",
+        url: path,
+        params,
+        host,
+        port,
+        authorization
+      },
+      lookupCredentials
+    ));
   } catch (err) {
     return response(
       401,
@@ -40,26 +46,49 @@ module.exports.post = async function(event, context) {
     );
   }
 
-  const result = await S3.putObject({
-    Bucket: CONTENT_BUCKET,
-    Key: requestId,
-    Body: "THIS WILL BE AN IMAGE SOMEDAY"
-  }).promise();
-  responseBody.s3Result = result;
+  let body, negative_uri, positive_uri, positive_email, notes, image;
+  try {
+    body = await parseRequestBody(event);
+    REQUIRED_FIELDS.forEach(name => {
+      if (!body[name]) {
+        throw { message: `Required "${name}" is missing` };
+      }
+    });
+    // TODO: More input validation here?
+    ({ negative_uri, positive_uri, positive_email, notes, image } = body);
+  } catch (err) {
+    return response(400, { error: err.message });
+  }
 
-  const { QueueUrl } = await SQS.getQueueUrl({
-    QueueName: QUEUE_NAME
+  const imageKey = `image-${requestId}`;
+
+  await S3.putObject({
+    Bucket,
+    Key: imageKey,
+    ContentType: image.contentType,
+    Body: image.data
   }).promise();
-  const { MessageId } = await SQS.sendMessage({
+
+  const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
+  await SQS.sendMessage({
+    QueueUrl,
     MessageBody: JSON.stringify({
-      nowish: Date.now(),
-      requestId
-    }),
-    QueueUrl
+      id: requestId,
+      user: credentials.id,
+      negative_uri,
+      positive_uri,
+      positive_email,
+      notes,
+      image: imageKey
+    })
   }).promise();
-  responseBody.sqsResult = "SUCCESS " + MessageId;
 
-  return response(200, responseBody);
+  return response(201, {
+    id: requestId,
+    negative_uri,
+    positive_uri,
+    positive_email
+  });
 };
 
 function response(statusCode, body, headers = {}) {
@@ -70,22 +99,35 @@ function response(statusCode, body, headers = {}) {
   };
 }
 
-async function authenticate({
-  method = "POST",
-  path,
-  queryStringParameters,
-  host,
-  port,
-  authorization
-}) {
-  const request = {
-    method,
-    url: path,
-    host,
-    port,
-    authorization
-  };
-  return Hawk.server.authenticate(request, lookupCredentials, {});
+function getContentType(event) {
+  let contentType = event.headers["content-type"];
+  if (!contentType) {
+    return event.headers["Content-Type"];
+  }
+  return contentType;
+}
+
+function parseRequestBody(event) {
+  return new Promise((resolve, reject) => {
+    const result = {};
+    const busboy = new Busboy({
+      headers: { "content-type": getContentType(event) }
+    });
+    busboy.on(
+      "file",
+      (fieldname, file, filename, contentEncoding, contentType) => {
+        result[fieldname] = { filename, contentEncoding, contentType };
+        const parts = [];
+        file.on("data", data => parts.push(data));
+        file.on("end", () => (result[fieldname].data = Buffer.concat(parts)));
+      }
+    );
+    busboy.on("field", (fieldname, value) => (result[fieldname] = value));
+    busboy.on("error", error => reject(`Parse error: ${error}`));
+    busboy.on("finish", () => resolve(result));
+    busboy.write(event.body, event.isBase64Encoded ? "base64" : "binary");
+    busboy.end();
+  });
 }
 
 // In-memory credentials lookup cache, only lasts until next deployment or
