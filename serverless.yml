@@ -9,9 +9,19 @@ custom:
   prefix: ${self:service}-${self:custom.stage}
   process: ${self:custom.prefix}-processQueueItem
   config: ${self:custom.prefix}-config
-  sns: ${self:custom.prefix}-trigger
+  credentials: ${self:custom.prefix}-credentials
   sqs: ${self:custom.prefix}-messages
   contentBucket: ${self:custom.prefix}-content
+  fnEnv:
+      NODE_ENV: ${env:NODE_ENV,"production"}
+      ENABLE_DEV_AUTH: ${env:ENABLE_DEV_AUTH,"0"}
+      SERVICE_STAGE: ${self:custom.stage}
+      SERVICE_PREFIX: ${self:custom.prefix}
+      CONFIG_TABLE: ${self:custom.config}
+      CREDENTIALS_TABLE: ${self:custom.credentials}
+      QUEUE_NAME: ${self:custom.sqs}
+      CONTENT_BUCKET: ${self:custom.contentBucket}
+      PROCESS_QUEUE_FUNCTION: ${self:custom.process}
   remover:
     buckets:
       - ${self:custom.contentBucket}
@@ -33,6 +43,7 @@ provider:
       - dynamodb:Scan
     Resource:
       - arn:aws:dynamodb:*:*:table/${self:custom.config}
+      - arn:aws:dynamodb:*:*:table/${self:custom.credentials}
   - Effect: Allow
     Action:
       - lambda:InvokeFunction
@@ -92,6 +103,20 @@ resources:
         QueueName: ${self:custom.sqs}-dead-letter-queue
         MessageRetentionPeriod: 1209600
 
+    Credentials:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.credentials}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
     Config:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -115,34 +140,24 @@ package:
 functions:
 
   accept:
-    handler: functions/accept.handler
+    handler: functions/accept.post
     name: ${self:custom.prefix}-accept
-    environment:
-      CONFIG_TABLE: ${self:custom.config}
-      QUEUE_NAME: ${self:custom.sqs}
-      CONTENT_BUCKET: ${self:custom.contentBucket}
+    environment: ${self:custom.fnEnv}
     events:
       - http:
           path: accept
-          method: get
+          method: post
 
   pollQueue:
     timeout: 60
     handler: functions/pollQueue.handler
     name: ${self:custom.prefix}-pollQueue
-    environment:
-      CONFIG_TABLE: ${self:custom.config}
-      QUEUE_NAME: ${self:custom.sqs}
-      CONTENT_BUCKET: ${self:custom.contentBucket}
-      PROCESS_QUEUE_FUNCTION: ${self:custom.process}
+    environment: ${self:custom.fnEnv}
     events:
       - schedule: rate(1 minute)
-  
+
   processQueueItem:
     timeout: 60
     handler: functions/processQueueItem.handler
     name: ${self:custom.process}
-    environment:
-      CONFIG_TABLE: ${self:custom.config}
-      QUEUE_NAME: ${self:custom.sqs}
-      CONTENT_BUCKET: ${self:custom.contentBucket}
+    environment: ${self:custom.fnEnv}
