@@ -1,49 +1,24 @@
-// const { URL } = require("url");
 const { expect } = require("chai");
 const sinon = require("sinon");
 const Hawk = require("hawk");
 const AWS = require("aws-sdk");
 
+const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
+
 const {
-  DEV_CREDENTIALS,
-  DEFAULT_HAWK_ALGORITHM
-} = require("../../lib/constants");
+  mocks,
+  makePromiseFn,
+  env: { CREDENTIALS_TABLE, QUEUE_NAME, CONTENT_BUCKET },
+  constants: { QueueUrl, MessageId, requestId }
+} = global;
 
-const mocks = {
-  putObject: (AWS.S3.prototype.putObject = sinon.stub()),
-  getQueueUrl: (AWS.SQS.prototype.getQueueUrl = sinon.stub()),
-  sendMessage: (AWS.SQS.prototype.sendMessage = sinon.stub()),
-  getItem: (AWS.DynamoDB.DocumentClient.prototype.get = sinon.stub())
-};
-
-const accept = require("../../functions/accept");
-
-const mkp = out => ({ promise: () => Promise.resolve(out) });
-
-const CREDENTIALS_TABLE = "test-credentials";
-const QUEUE_NAME = "test-queue";
-const CONTENT_BUCKET = "test-bucket";
-const QueueUrl = "https://example.com/sqs/";
-const ETag = '"abcdef1234567890"';
-const MessageId = "abba123";
-const requestId = "8675309";
+const accept = require("./accept");
 
 describe("functions/accept.post", () => {
   beforeEach(() => {
-    Object.assign(process.env, {
-      QUEUE_NAME,
-      CONTENT_BUCKET,
-      CREDENTIALS_TABLE
-    });
+    global.resetMocks();
     process.env.ENABLE_DEV_AUTH = "1";
     process.env.DISABLE_AUTH_CACHE = "1";
-
-    mocks.putObject.returns(mkp({ ETag }));
-    mocks.getQueueUrl.returns(mkp({ QueueUrl }));
-    mocks.sendMessage.returns(mkp({ MessageId }));
-    mocks.getItem.returns(mkp({}));
-
-    Object.values(mocks).forEach(mock => mock.resetHistory());
   });
 
   describe("Hawk authentication", () => {
@@ -74,7 +49,7 @@ describe("functions/accept.post", () => {
       const badid = "somerando";
       const key = "realkey";
 
-      mocks.getItem.returns(mkp({}));
+      mocks.getItem.returns(makePromiseFn({}));
 
       const result = await acceptPost({
         httpMethod: "POST",
@@ -101,7 +76,7 @@ describe("functions/accept.post", () => {
       const badkey = "badkey";
       const algorithm = "sha256";
 
-      mocks.getItem.returns(mkp({ Item: { key, algorithm } }));
+      mocks.getItem.returns(makePromiseFn({ Item: { key, algorithm } }));
 
       const result = await acceptPost({
         httpMethod: "POST",
@@ -147,7 +122,7 @@ describe("functions/accept.post", () => {
       const key = "realkey";
       const algorithm = "sha256";
 
-      mocks.getItem.returns(mkp({ Item: { key, algorithm } }));
+      mocks.getItem.returns(makePromiseFn({ Item: { key, algorithm } }));
 
       const result = await acceptPost({
         httpMethod: "POST",
@@ -223,7 +198,6 @@ describe("functions/accept.post", () => {
         Bucket: CONTENT_BUCKET,
         Key: `image-${requestId}`,
         Body: new Buffer(imageContent),
-        // ContentEncoding: "7bit",
         ContentType: imageContentType
       });
       expect(mocks.getQueueUrl.args[0][0]).to.deep.equal({

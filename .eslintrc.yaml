@@ -16,7 +16,8 @@ rules:
 
 overrides:
   -
-    files: ['test/**/*.js']
+    files:
+      - '**/*-test.js'
     rules:
       import/unambiguous: off
     env:

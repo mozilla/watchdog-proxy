@@ -13,9 +13,16 @@ custom:
   credentials: ${self:custom.prefix}-credentials
   sqs: ${self:custom.prefix}-messages
   contentBucket: ${self:custom.prefix}-content
+  remover:
+    buckets:
+      - ${self:custom.contentBucket}
+  apigwBinary:
+    types:
+      - 'multipart/form-data'
   fnEnv:
       NODE_ENV: ${env:NODE_ENV,"production"}
       ENABLE_DEV_AUTH: ${env:ENABLE_DEV_AUTH,"0"}
+      UPSTREAM_SERVICE_URL: ${env:UPSTREAM_SERVICE_URL,"https://webhook.site/c0a8dd46-1405-4172-a99a-0646663f3dc2"}
       SERVICE_STAGE: ${self:custom.stage}
       SERVICE_PREFIX: ${self:custom.prefix}
       CONFIG_TABLE: ${self:custom.config}
@@ -23,12 +30,6 @@ custom:
       QUEUE_NAME: ${self:custom.sqs}
       CONTENT_BUCKET: ${self:custom.contentBucket}
       PROCESS_QUEUE_FUNCTION: ${self:custom.process}
-  remover:
-    buckets:
-      - ${self:custom.contentBucket}
-  apigwBinary:
-    types:
-      - 'multipart/form-data'
 
 provider:
   name: aws
@@ -140,6 +141,7 @@ package:
     - docs/**
     - helpers/**
     - test/**
+    - functions/**/*-test.js
 
 functions:
 
