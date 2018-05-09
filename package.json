@@ -49,11 +49,13 @@
     "onchange": "4.0.0",
     "prettier": "1.12.1",
     "serverless": "1.27.2",
+    "serverless-apigw-binary": "^0.4.4",
     "serverless-s3-remover": "0.4.1",
     "serverless-sqs-alarms-plugin": "0.1.7",
     "sinon": "5.0.7"
   },
   "dependencies": {
+    "busboy": "0.2.14",
     "hawk": "7.0.7",
     "request": "2.85.0",
     "request-promise-native": "1.0.5"
