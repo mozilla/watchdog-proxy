@@ -6,49 +6,60 @@ const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const request = require("request-promise-native");
 
 module.exports.handler = async function({ ReceiptHandle, Body }) {
-  const { QUEUE_NAME, CONTENT_BUCKET, UPSTREAM_SERVICE_URL } = process.env;
+  const {
+    QUEUE_NAME,
+    CONTENT_BUCKET,
+    UPSTREAM_SERVICE_URL,
+    UPSTREAM_SERVICE_KEY
+  } = process.env;
 
   const {
     id,
-    user,
+    // user,
     negative_uri,
     positive_uri,
-    positive_email,
-    notes,
+    // positive_email,
+    // notes,
     image
   } = JSON.parse(Body);
 
-  console.log("MESSAGE BODY", {
-    id,
-    user,
-    negative_uri,
-    positive_uri,
-    positive_email,
-    notes,
-    image
-  });
-
   try {
-    const imageKey = `image-${id}`;
-
-    const getResult = await S3.getObject({
+    const imageUrl = S3.getSignedUrl("getObject", {
       Bucket: CONTENT_BUCKET,
-      Key: imageKey
-    }).promise();
-    console.log("GET", getResult);
+      Key: image
+    });
 
-    await S3.deleteObject({
-      Bucket: CONTENT_BUCKET,
-      Key: imageKey
+    const upstreamServiceResponse = await request.post({
+      url: `${UPSTREAM_SERVICE_URL}?enhance`,
+      headers: {
+        "Content-Type": "application/json",
+        "Ocp-Apim-Subscription-Key": UPSTREAM_SERVICE_KEY
+      },
+      json: true,
+      body: {
+        DataRepresentation: "URL",
+        Value: imageUrl
+      }
+    });
+
+    await request.post({
+      url: upstreamServiceResponse.IsMatch ? positive_uri : negative_uri,
+      headers: {
+        "Content-Type": "application/json"
+      },
+      json: true,
+      body: {
+        watchdog_id: id,
+        positive: upstreamServiceResponse.IsMatch
+      }
+    });
+
+    const { QueueUrl } = await SQS.getQueueUrl({
+      QueueName: QUEUE_NAME
     }).promise();
 
-    await request.get(`${UPSTREAM_SERVICE_URL}?id=${id}`);
+    await SQS.deleteMessage({ QueueUrl, ReceiptHandle }).promise();
   } catch (err) {
     console.log("REQUEST ERROR", err);
   }
-
-  const { QueueUrl } = await SQS.getQueueUrl({
-    QueueName: QUEUE_NAME
-  }).promise();
-  await SQS.deleteMessage({ QueueUrl, ReceiptHandle }).promise();
 };

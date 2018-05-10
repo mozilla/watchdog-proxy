@@ -1,12 +1,14 @@
 const { expect } = require("chai");
-const sinon = require("sinon");
-const AWS = require("aws-sdk");
-const request = require("request-promise-native");
 
 const {
   mocks,
-  env: { CREDENTIALS_TABLE, QUEUE_NAME, CONTENT_BUCKET, UPSTREAM_SERVICE_URL },
-  constants: { QueueUrl, MessageId, ReceiptHandle }
+  env: {
+    QUEUE_NAME,
+    CONTENT_BUCKET,
+    UPSTREAM_SERVICE_URL,
+    UPSTREAM_SERVICE_KEY
+  },
+  constants: { QueueUrl, ReceiptHandle }
 } = global;
 
 // NOTE: Import the test subject as late as possible so that the mocks work
@@ -17,32 +19,64 @@ describe("functions/processQueueItem.handler", () => {
     global.resetMocks();
   });
 
-  it("should exist", async () => {
-    expect(processQueueItem.handler).to.not.be.undefined;
+  it("hits negative_uri on negative match from upstream service", async () => {
+    mocks.requestPost
+      .onCall(0)
+      .resolves(negativeMatchResponse)
+      .onCall(1)
+      .resolves({});
+    await expectCommonItemProcessed(false);
   });
 
-  it("should make a request to the upstream service and original client", async () => {
+  it("hits positive_uri on positive match from upstream service", async () => {
+    mocks.requestPost
+      .onCall(0)
+      .resolves(positiveMatchResponse)
+      .onCall(1)
+      .resolves({});
+    await expectCommonItemProcessed(true);
+  });
+
+  const expectCommonItemProcessed = async positive => {
     const Body = makeBody();
+    const signedImageUrl = "https://example.s3.amazonaws.com/someimage";
 
-    const result = await processQueueItem.handler({ ReceiptHandle, Body });
+    mocks.getSignedUrl.returns(signedImageUrl);
 
-    console.log("RESULT", result);
+    await processQueueItem.handler({ ReceiptHandle, Body });
 
-    const imageKey = `image-${defaultMessage.id}`;
+    expect(mocks.getSignedUrl.lastCall.args).to.deep.equal([
+      "getObject",
+      {
+        Bucket: CONTENT_BUCKET,
+        Key: defaultMessage.image
+      }
+    ]);
 
-    expect(mocks.getObject.args[0][0]).to.deep.equal({
-      Bucket: CONTENT_BUCKET,
-      Key: imageKey
+    expect(mocks.requestPost.args[0][0]).to.deep.equal({
+      url: `${UPSTREAM_SERVICE_URL}?enhance`,
+      headers: {
+        "Content-Type": "application/json",
+        "Ocp-Apim-Subscription-Key": UPSTREAM_SERVICE_KEY
+      },
+      json: true,
+      body: {
+        DataRepresentation: "URL",
+        Value: signedImageUrl
+      }
     });
 
-    expect(mocks.deleteObject.args[0][0]).to.deep.equal({
-      Bucket: CONTENT_BUCKET,
-      Key: imageKey
+    expect(mocks.requestPost.args[1][0]).to.deep.equal({
+      url: defaultMessage[positive ? "positive_uri" : "negative_uri"],
+      headers: {
+        "Content-Type": "application/json"
+      },
+      json: true,
+      body: {
+        watchdog_id: defaultMessage.id,
+        positive
+      }
     });
-
-    expect(mocks.requestGet.lastCall.args[0]).to.equal(
-      `${UPSTREAM_SERVICE_URL}?id=${defaultMessage.id}`
-    );
 
     expect(mocks.getQueueUrl.lastCall.args[0]).to.deep.equal({
       QueueName: QUEUE_NAME
@@ -52,15 +86,62 @@ describe("functions/processQueueItem.handler", () => {
       QueueUrl,
       ReceiptHandle
     });
-  });
+  };
 });
+
+const negativeMatchResponse = {
+  Status: {
+    Code: 3000,
+    Description: "OK",
+    Exception: null
+  },
+  ContentId: null,
+  IsMatch: false,
+  MatchDetails: {
+    AdvancedInfo: [],
+    MatchFlags: []
+  },
+  XPartnerCustomerId: null,
+  TrackingId:
+    "WUS_418b5903425346a1b1451821c5cd06ee_57c7457ae3a97812ecf8bde9_ddba296dab39454aa00cf0b17e0eb7bf",
+  EvaluateResponse: null
+};
+
+const positiveMatchResponse = {
+  Status: {
+    Code: 3000,
+    Description: "OK",
+    Exception: null
+  },
+  ContentId: null,
+  IsMatch: true,
+  MatchDetails: {
+    AdvancedInfo: [],
+    MatchFlags: [
+      {
+        AdvancedInfo: [
+          {
+            Key: "MatchId",
+            Value: "117721"
+          }
+        ],
+        Source: "Test",
+        Violations: ["A1"]
+      }
+    ]
+  },
+  XPartnerCustomerId: null,
+  TrackingId:
+    "WUS_418b5903425346a1b1451821c5cd06ee_57c7457ae3a97812ecf8bde9_0709e0136ee342e993092edceecbc407",
+  EvaluateResponse: null
+};
 
 const defaultMessage = {
   id: "8675309",
   user: "devuser",
   negative_uri: "https://example.com/negative?id=123",
   positive_uri: "https://example.com/positive?id=123",
-  image: "123-456-789-1011"
+  image: "image-8675309"
 };
 
 const makeBody = (message = {}) =>

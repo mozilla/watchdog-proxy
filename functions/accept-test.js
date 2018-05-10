@@ -1,7 +1,5 @@
 const { expect } = require("chai");
-const sinon = require("sinon");
 const Hawk = require("hawk");
-const AWS = require("aws-sdk");
 
 const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
 
@@ -9,7 +7,7 @@ const {
   mocks,
   makePromiseFn,
   env: { CREDENTIALS_TABLE, QUEUE_NAME, CONTENT_BUCKET },
-  constants: { QueueUrl, MessageId, requestId }
+  constants: { QueueUrl, requestId }
 } = global;
 
 const accept = require("./accept");

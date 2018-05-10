@@ -23,6 +23,7 @@ custom:
       NODE_ENV: ${env:NODE_ENV,"production"}
       ENABLE_DEV_AUTH: ${env:ENABLE_DEV_AUTH,"0"}
       UPSTREAM_SERVICE_URL: ${env:UPSTREAM_SERVICE_URL,"https://webhook.site/c0a8dd46-1405-4172-a99a-0646663f3dc2"}
+      UPSTREAM_SERVICE_KEY: ${env:UPSTREAM_SERVICE_KEY,"thisisnotakey"}
       SERVICE_STAGE: ${self:custom.stage}
       SERVICE_PREFIX: ${self:custom.prefix}
       CONFIG_TABLE: ${self:custom.config}
