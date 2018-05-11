@@ -5,8 +5,9 @@ plugins:
   - serverless-apigw-binary
 
 custom:
+  localConfig: ${file(serverless.local.yml)}
   region: ${self:provider.region}
-  stage: ${opt:stage, self:provider.stage}
+  stage: ${self:provider.stage}
   prefix: ${self:service}-${self:custom.stage}
   process: ${self:custom.prefix}-processQueueItem
   config: ${self:custom.prefix}-config
@@ -21,9 +22,10 @@ custom:
       - 'multipart/form-data'
   fnEnv:
       NODE_ENV: ${env:NODE_ENV,"production"}
+      DISABLE_AUTH_CACHE: ${env:DISABLE_AUTH_CACHE, "0"}
       ENABLE_DEV_AUTH: ${env:ENABLE_DEV_AUTH,"0"}
-      UPSTREAM_SERVICE_URL: ${env:UPSTREAM_SERVICE_URL,"https://webhook.site/c0a8dd46-1405-4172-a99a-0646663f3dc2"}
-      UPSTREAM_SERVICE_KEY: ${env:UPSTREAM_SERVICE_KEY,"thisisnotakey"}
+      UPSTREAM_SERVICE_URL: ${env:UPSTREAM_SERVICE_URL, self:custom.localConfig.upstreamService.url}
+      UPSTREAM_SERVICE_KEY: ${env:UPSTREAM_SERVICE_KEY, self:custom.localConfig.upstreamService.key}
       SERVICE_STAGE: ${self:custom.stage}
       SERVICE_PREFIX: ${self:custom.prefix}
       CONFIG_TABLE: ${self:custom.config}
@@ -35,7 +37,7 @@ custom:
 provider:
   name: aws
   runtime: nodejs8.10
-  stage: dev
+  stage: ${self:custom.localConfig.stage, opt:stage, 'dev'}
   region: us-east-1
   memorySize: 128
   iamRoleStatements:

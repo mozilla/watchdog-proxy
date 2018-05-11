@@ -4,8 +4,9 @@
   "description": "Rate limiting proxy for watchdog requests",
   "scripts": {
     "precommit": "lint-staged && npm run test:js",
-    "deploy": "serverless deploy",
-    "deploy:dev": "cross-env-shell NODE_ENV=development ENABLE_DEV_AUTH=1 npm run deploy --",
+    "deploy": "cross-env NODE_ENV=production serverless deploy",
+    "deploy:dev": "cross-env NODE_ENV=development ENABLE_DEV_AUTH=1 serverless deploy",
+    "info": "serverless info",
     "lint": "npm-run-all lint:*",
     "lint:js": "eslint functions lib test",
     "prettier": "prettier --write \"{functions,lib}/**/*.js\"",
