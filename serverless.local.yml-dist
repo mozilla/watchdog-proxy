@@ -1,0 +1,7 @@
+# Change this to a name that's unique to you
+stage: your-name-here-dev
+
+# Point this at a debugging URL to watch your stack sending requests
+upstreamService:
+  url: https://webhook.site/c0a8dd46-1405-4172-a99a-0646663f3dc2
+  key: 8675309
