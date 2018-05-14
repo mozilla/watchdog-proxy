@@ -11,7 +11,11 @@ const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
 const REQUIRED_FIELDS = ["image", "negative_uri", "positive_uri"];
 
 module.exports.post = async function(event, context) {
-  const { QUEUE_NAME: QueueName, CONTENT_BUCKET: Bucket } = process.env;
+  const {
+    UPSTREAM_SERVICE_URL,
+    QUEUE_NAME: QueueName,
+    CONTENT_BUCKET: Bucket
+  } = process.env;
 
   const {
     headers,
@@ -69,10 +73,20 @@ module.exports.post = async function(event, context) {
     Body: image.data
   }).promise();
 
+  const upstreamServiceUrl =
+    UPSTREAM_SERVICE_URL !== "__MOCK__"
+      ? UPSTREAM_SERVICE_URL
+      : "https://" +
+        event.headers.Host +
+        "/" +
+        event.requestContext.stage +
+        "/mock/upstream";
+
   const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
   await SQS.sendMessage({
     QueueUrl,
     MessageBody: JSON.stringify({
+      upstreamServiceUrl,
       id: requestId,
       user: credentials.id,
       negative_uri,

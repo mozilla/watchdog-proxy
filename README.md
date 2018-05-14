@@ -83,7 +83,23 @@ If everything was successful, you should now have a running stack with an HTTPS 
 
 To send your first request, use the `client` script with the GET endpoint URL:
 ```
-npm run client -- https://30r00qsyhf.execute-api.us-east-1.amazonaws.com/lmorchard/accept
+npm run client
+```
+
+With no options, this command should attempt to auto-detect the endpoint URL for your deployed stack. You can check to see the results of this request working its way through the stack with the following log commands:
+```
+# Client request is accepted into the queue
+npm run logs -- -f accept
+# Client request is received from the queue
+npm run logs -- -f pollQueue
+# Queued job is processed
+npm run logs -- -f processQueueItem
+# Upstream service receives a request
+npm run logs -- -f mockUpstream
+# Client callback service receives a negative result
+npm run logs -- -f mockClientNegative
+# Client callback service receives a positive result
+npm run logs -- -f mockClientPositive
 ```
 
 If you want to remove this stack from AWS and delete everything, run `npm run remove`

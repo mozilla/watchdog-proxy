@@ -9,7 +9,7 @@
     "info": "serverless info",
     "lint": "npm-run-all lint:*",
     "lint:js": "eslint functions lib test",
-    "prettier": "prettier --write \"{functions,lib}/**/*.js\"",
+    "prettier": "prettier --write \"{functions,lib,bin}/**/*.js\"",
     "logs": "serverless logs",
     "postlint": "nsp check -o summary",
     "nsp": "nsp check",
