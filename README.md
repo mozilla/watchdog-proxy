@@ -97,9 +97,10 @@ The [Serverless docs on workflow are useful](https://serverless.com/framework/do
 When using `serverless deploy` to deploy the stack, you can use several environment variables to alter configuration:
 
 - `NODE_ENV` - Use `production` for a more optimized production build, `development` for a development build with more verbose logging and other conveniences
+- `GIT_COMMIT` - The value reported by the `__version__` resource as `commit`. If not set, Serverless config will attempt to run the `git` command to discover the current commit.
 - `UPSTREAM_SERVICE_URL` - the URL of the production upstream web service (i.e. PhotoDNA)
 - `UPSTREAM_SERVICE_KEY` - the private subscription key for the upstream web service
-- `ENABLE_DEV_AUTH=1` - This enables a hardcoded user id / key for development
+- `ENABLE_DEV_AUTH=1` - This enables a hardcoded user id / key for development (off by default)
 - `DISABLE_AUTH_CACHE=1` - Authentication credentials are cached in memory in the `accept` API function. This lasts until AWS recycles the container hosting the function. Setting this variable disables the cache.
 
 You can see these variables used by scripts defined in `package.json` for development convenience.

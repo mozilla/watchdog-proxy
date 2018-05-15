@@ -6,6 +6,7 @@ plugins:
 
 custom:
   localConfig: ${file(serverless.local.yml)}
+  dynamicConfig: ${file(serverless.dynamicConfig.js)}
   region: ${self:provider.region}
   stage: ${self:provider.stage}
   prefix: ${self:service}-${self:custom.stage}
@@ -22,6 +23,7 @@ custom:
       - 'multipart/form-data'
   fnEnv:
       NODE_ENV: ${env:NODE_ENV,"production"}
+      GIT_COMMIT: ${self:custom.dynamicConfig.GIT_COMMIT}
       DISABLE_AUTH_CACHE: ${env:DISABLE_AUTH_CACHE, "0"}
       ENABLE_DEV_AUTH: ${env:ENABLE_DEV_AUTH,"0"}
       UPSTREAM_SERVICE_URL: ${env:UPSTREAM_SERVICE_URL, self:custom.localConfig.upstreamService.url}
@@ -147,6 +149,24 @@ package:
     - functions/**/*-test.js
 
 functions:
+
+  version:
+    handler: functions/version.handler
+    name: ${self:custom.prefix}-version
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: __version__
+          method: get
+
+  heartbeat:
+    handler: functions/heartbeat.handler
+    name: ${self:custom.prefix}-heartbeat
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: __heartbeat__
+          method: get
 
   accept:
     handler: functions/accept.post
