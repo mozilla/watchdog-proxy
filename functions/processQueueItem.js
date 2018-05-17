@@ -6,14 +6,10 @@ const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const request = require("request-promise-native");
 
 module.exports.handler = async function({ ReceiptHandle, Body }) {
-  const {
-    QUEUE_NAME,
-    CONTENT_BUCKET,
-    UPSTREAM_SERVICE_URL,
-    UPSTREAM_SERVICE_KEY
-  } = process.env;
+  const { QUEUE_NAME, CONTENT_BUCKET, UPSTREAM_SERVICE_KEY } = process.env;
 
   const {
+    upstreamServiceUrl,
     id,
     // user,
     negative_uri,
@@ -30,7 +26,7 @@ module.exports.handler = async function({ ReceiptHandle, Body }) {
     });
 
     const upstreamServiceResponse = await request.post({
-      url: `${UPSTREAM_SERVICE_URL}?enhance`,
+      url: `${upstreamServiceUrl}?enhance`,
       headers: {
         "Content-Type": "application/json",
         "Ocp-Apim-Subscription-Key": UPSTREAM_SERVICE_KEY

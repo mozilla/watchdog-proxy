@@ -137,6 +137,7 @@ const positiveMatchResponse = {
 };
 
 const defaultMessage = {
+  upstreamServiceUrl: UPSTREAM_SERVICE_URL,
   id: "8675309",
   user: "devuser",
   negative_uri: "https://example.com/negative?id=123",

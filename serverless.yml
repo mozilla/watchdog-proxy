@@ -170,3 +170,32 @@ functions:
     handler: functions/processQueueItem.handler
     name: ${self:custom.process}
     environment: ${self:custom.fnEnv}
+
+  # TODO: Find a way to exclude these functions from prod deployments
+  # See https://stackoverflow.com/questions/47718004/exclude-lambda-function-from-deploy-to-a-particular-stage
+  mockUpstream:
+    handler: functions/mockEndpoints.upstreamPost
+    name: ${self:custom.prefix}-mockUpstream
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: mock/upstream
+          method: post
+
+  mockClientNegative:
+    handler: functions/mockEndpoints.clientNegativePost
+    name: ${self:custom.prefix}-mockClientNegative
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: mock/client/negative
+          method: post
+
+  mockClientPositive:
+    handler: functions/mockEndpoints.clientPositivePost
+    name: ${self:custom.prefix}-mockClientPositive
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: mock/client/positive
+          method: post
