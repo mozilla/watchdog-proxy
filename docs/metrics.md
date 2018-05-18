@@ -1,5 +1,5 @@
 # Watchdog Metrics
-*Last Update: 2018-04-20*
+*Last Update: 2018-05-18*
 
 ## Analysis
 Questions we want to answer with metrics data include:
@@ -25,30 +25,100 @@ application.
 ## Collection
 This project uses Ping Centre to collect metrics data.  Pings will be sent as
 JSON blobs.  All pings will include the following fields:
-- Current timestamp: string
+- *topic*: used by Ping Centre. In this case always "watchdog-proxy": string
+- *timestamp*: Using the toISOString() standard: string
+
 
 ## Events
 Additional fields submitted are described below.
 
 ### A new item is submitted from a consumer
-- ID of the consumer: integer
-- Number of items in message queue: integer
-- Type of item submitted (eg. 'png' or 'jpg'): string
+- *consumer_id*: the ID of the consumer submitting the request: integer
+- *event*: "new_item": string
+- *watchdog_id*: the ID assigned to the task: string
+- *type*: Type of item submitted (eg. 'png' or 'jpg'): string
 
-### A worker wakes up or sleeps
+Example:
+```
+{
+  "topic": "watchdog-proxy",
+  "timestamp": "2018-05-18T16:38:33.464Z",
+
+  "consumer_id": 101,
+  "event": "new_item",
+  "watchdog_id": "9ad08ec4-be1a-4327-b4ef-282bed37621f"
+  "type": "png",
+}
+```
+
+### A worker wakes up
 A worker wakes up periodically to process the queue.  When it wakes up it
 selects a portion of the queue to process and it shuts down when it finishes
 processing them.  When the worker wakes up *or* shuts down, it will send:
-- Number of items in the queue: integer
+- *event*: "worker_awakes": string
+- *items_in_queue*: Number of items in the queue before the worker removes any: integer
+- *items_to_claim*: Number of items the worker will take out: integer
 
-### Worker processes the queue
+Example:
+```
+{
+  "topic": "watchdog-proxy",
+  "timestamp": "2018-05-18T16:38:33.464Z",
+
+  "event": "worker_awakes",
+  "items_in_queue": 1504,
+  "items_to_claim": 250
+}
+```
+
+### A worker processes the queue
 For *each* item it processes:
-- Timing (in ms):
-  - To retrieve item from the queue: integer
-  - To send and receive a response from PhotoDNA: integer
-  - To send a response to the consumer's report URL: integer
-- Whether the response was positive or negative: string
+- *event*: "worker_works": string
+- *consumer_id*: the ID of the consumer submitting the request: integer
+- *watchdog_id*: the ID assigned to the task: string
+- *photodna_tracking_id*: ID from PhotoDNA: string
+- *is_match*: Whether the response was positive or negative: boolean
+- *is_error*: Was the response an error?: boolean
+- *timing_retrieved*: time (in ms) to retrieve item from queue: integer
+- *timing_sent*: time (in ms) to send item to PhotoDNA: integer
+- *timing_received*: time (in ms) before response from PhotoDNA: integer
+- *timing_submitted*: time (in ms) to finish sending a response to consumer's report URL: integer
 
+Example:
+```
+{
+  "topic": "watchdog-proxy",
+  "timestamp": "2018-05-18T16:38:33.464Z",
 
-TODO: This doesn't address processing positive identifications yet as that
-interface/process isn't defined yet.
+  "event": "worker_works",
+  "consumer_id": 101,
+  "watchdog_id": "9ad08ec4-be1a-4327-b4ef-282bed37621f"
+  "photodna_tracking_id": "1_photodna_a0e3d02b-1a0a-4b38-827f-764acd288c25",
+  "is_match": false,
+  "is_error": false
+
+  "timing_retrieved": 8,
+  "timing_sent": 89,
+  "timing_received": 161,
+  "timing_submitted": 35
+}
+```
+
+### A worker shuts down
+When a worker finishes the work it claimed it shuts down.  When it does, it will
+send:
+- *event*: "worker_sleeps": string
+- *items_in_queue*: Number of items in the queue: integer
+- *items_processed*: Number of items the worker processed successfully: integer
+
+Example:
+```
+{
+  "topic": "watchdog-proxy",
+  "timestamp": "2018-05-18T16:38:33.464Z",
+
+  "event": "worker_sleeps",
+  "items_in_queue": 1504,
+  "items_processed": 250
+}
+```
