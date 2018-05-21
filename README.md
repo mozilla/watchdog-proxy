@@ -4,6 +4,9 @@
 
 This is a simple proxy which interfaces with Microsoft's [PhotoDNA Service](https://www.microsoft.com/en-us/photodna).
 
+## Systems Diagram
+<img src="docs/systems_diagram.png" alt="Systems Diagram" />
+
 ## Development
 
 ### Useful NPM scripts
@@ -122,6 +125,3 @@ When using `serverless deploy` to deploy the stack, you can use several environm
 - `DISABLE_AUTH_CACHE=1` - Authentication credentials are cached in memory in the `accept` API function. This lasts until AWS recycles the container hosting the function. Setting this variable disables the cache.
 
 You can see these variables used by scripts defined in `package.json` for development convenience.
-
-## Systems Diagram
-<img src="docs/systems_diagram.png" alt="Systems Diagram" />
