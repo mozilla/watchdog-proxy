@@ -6,3 +6,14 @@ stage: your-name-here-dev
 upstreamService:
   url: __MOCK__
   key: __MOCK__
+
+# Uncomment and change the following properties to set up a custom domain for
+# your own dev stack
+customDomain:
+  enabled: false
+  # enabled: true
+  # stage: your-name-here-dev
+  # domainName: watchdog-proxy-your-name.dev.mozaws.net
+  # certificateArn: 'arn:aws:acm:us-east-1:927034868273:certificate/61e462bd-410e-48b6-95da-fa5501430d1d'
+  # basePath: ''
+  # createRoute53Record: true

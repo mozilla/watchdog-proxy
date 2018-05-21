@@ -111,12 +111,26 @@ If you want to remove this stack from AWS and delete everything, run `npm run re
 
 The [Serverless docs on workflow are useful](https://serverless.com/framework/docs/providers/aws/guide/workflow/).
 
+### Custom stable domain name for local development
+
+By default, no custom domain name is created. You can use the semi-random domain name serverless offers on deployment and with `serverless info`.
+
+If you want to create a domain name for local development (e.g. `watchdog-proxy-lmorchard.dev.mozaws.net`):
+
+1. Edit your `serverless.local.yml` to contain an enabled `customDomain` section with appropriate details
+1. Run `npx serverless create_domain` - this only needs to be done once, to create the new custom domain name in Route53 and an accompanying CloudFront distribution
+1. Run `npm run deploy:dev` to update your stack
+
+Read this Serverless Blog post for more details: https://serverless.com/blog/serverless-api-gateway-domain/
+
 ## Deployment
 
 ### Environment variables
 
 When using `serverless deploy` to deploy the stack, you can use several environment variables to alter configuration:
 
+- `STAGE` - Stage for building and deploying - e.g. `dev`, `stage`, `production`
+- `DOMAIN` - Custom domain config selection for Route 53 and CloudFront distribution - e.g. `local`, `dev`, `stage`, `production`. If omitted, custom domain handling is disabled
 - `NODE_ENV` - Use `production` for a more optimized production build, `development` for a development build with more verbose logging and other conveniences
 - `GIT_COMMIT` - The value reported by the `__version__` resource as `commit`. If not set, Serverless config will attempt to run the `git` command to discover the current commit.
 - `UPSTREAM_SERVICE_URL` - the URL of the production upstream web service (i.e. PhotoDNA)

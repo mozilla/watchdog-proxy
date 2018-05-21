@@ -28,6 +28,7 @@ async function main() {
     const endpointURL = await discoverEndpointURL();
     url = `${endpointURL}/accept`;
   }
+  console.log("URL", url);
 
   let negative_uri = program.negative;
   if (!negative_uri) {
