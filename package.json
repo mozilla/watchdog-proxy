@@ -6,6 +6,7 @@
     "precommit": "lint-staged && npm run test:js",
     "deploy": "cross-env NODE_ENV=production serverless deploy",
     "deploy:dev": "cross-env NODE_ENV=development ENABLE_DEV_AUTH=1 serverless deploy",
+    "deploy:master": "cross-env STAGE=dev DOMAIN=dev NODE_ENV=development ENABLE_DEV_AUTH=1 UPSTREAM_SERVICE_URL=__MOCK__ UPSTREAM_SERVICE_KEY=__MOCK__ serverless deploy",
     "info": "serverless info",
     "lint": "npm-run-all lint:*",
     "lint:js": "eslint functions lib test",
@@ -52,6 +53,7 @@
     "prettier": "1.12.1",
     "serverless": "1.27.2",
     "serverless-apigw-binary": "0.4.4",
+    "serverless-domain-manager": "github:lmorchard/serverless-domain-manager#certificateArn-config",
     "serverless-s3-remover": "0.4.1",
     "serverless-sqs-alarms-plugin": "0.1.7",
     "sinon": "5.0.7"

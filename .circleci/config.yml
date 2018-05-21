@@ -17,8 +17,16 @@ jobs:
           key: v1-dependencies-{{ checksum "package.json" }}
       - run: npm run lint
       - run: npm test
+  deploy_dev:
+    - run: npm deploy:master
+
 workflows:
   version: 2
-  test:
+  test_and_deploy:
     jobs:
       - test
+      - deploy_dev:
+          branches:
+            only: master
+          requires:
+            - test
