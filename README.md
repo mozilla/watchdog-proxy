@@ -5,7 +5,24 @@
 This is a simple proxy which interfaces with Microsoft's [PhotoDNA Service](https://www.microsoft.com/en-us/photodna).
 
 ## Systems Diagram
+
 <img src="docs/systems_diagram.png" alt="Systems Diagram" />
+
+### Quick summary of operation
+
+1. A third-party Consumer sends an HTTP POST request to the AWS API gateway to invoke the Accept lambda function
+1. The Accept function authenticates the Consumer's credentials supplied via Hawk against a DynamoDB table
+1. If the credentials & parameters are valid, details of the Consumer's submission are sent to the SQS queue and the uploaded image is saved in a private S3 bucket.
+1. Every 60 seconds, a CloudWatch alarm executes the Queue Processor lambda function.
+1. The Queue Processor attempts an atomic write to a DynamoDB table as a form of mutex to ensure only one Queue Processor is running at any given time. The function exists if the atomic write fails.
+1. The Queue Processor lambda function runs for most of 60 seconds, using long-polling on the SQS queue for submissions and exiting when the budgeted time remaining for execution is less than a second.
+1. The Queue Processor receives SQS messages, up to a rate limit (currently 5 per second)
+1. An Event Processor lambda function is invoked for each received SQS message
+1. The Event Processor function calls the upstream web service (i.e. PhotoDNA) with the details of a Consumer submission
+1. On a response from the upstream web service, the Event Processor makes a request back to a URL included in the Consumer submission
+1. Finally, on success, the Event Processor deletes the message from the SQS queue to acknowledge completion
+
+Note: images in the S3 bucket are not currently deleted, though objects in the bucket have a 30-day expiration
 
 ## Development
 
