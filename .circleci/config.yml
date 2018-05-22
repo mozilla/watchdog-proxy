@@ -17,8 +17,27 @@ jobs:
           key: v1-dependencies-{{ checksum "package.json" }}
       - run: npm run lint
       - run: npm test
+      - persist_to_workspace:
+          root: .
+          paths:
+            - ./*
+  deploy_dev:
+    docker:
+      - image: circleci/node:8.11.2@sha256:495a13db597b5306f05ae728489fedb9faa4defbac24ca0e00e8cc1eca95396d
+    working_directory: ~/repo
+    steps:
+      - attach_workspace:
+          at: .
+      - run: npm run deploy:master
+
 workflows:
   version: 2
-  test:
+  test_and_deploy:
     jobs:
       - test
+      - deploy_dev:
+          requires:
+            - test
+          filters:
+            branches:
+              only: master

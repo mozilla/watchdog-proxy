@@ -3,6 +3,7 @@ service: watchdog-proxy
 plugins:
   - serverless-s3-remover
   - serverless-apigw-binary
+  - serverless-domain-manager
 
 custom:
   localConfig: ${file(serverless.local.yml)}
@@ -15,6 +16,40 @@ custom:
   credentials: ${self:custom.prefix}-credentials
   sqs: ${self:custom.prefix}-messages
   contentBucket: ${self:custom.prefix}-content
+
+  # This customDomain stuff is a little complicated to allow switching between
+  # deployment stages / modes
+  customDomain: ${self:custom.customDomainVariants.${env:DOMAIN, "local"}}
+  customDomainDisabled:
+    enabled: false
+  customDomainVariants:
+    local: ${file(serverless.local.yml):customDomain, self:custom.customDomainDisabled}
+    disabled:
+      enabled: false
+    dev:
+      domainName: ${self:service}.dev.mozaws.net
+      certificateArn: 'arn:aws:acm:us-east-1:927034868273:certificate/61e462bd-410e-48b6-95da-fa5501430d1d'
+      basePath: ''
+      stage: ${self:provider.stage}
+      createRoute53Record: true
+      enabled: true
+    stage:
+      # TODO: Tweak this so it has the right properties for staging, even if all pulled from env
+      domainName: ${self:service}-stage.dev.mozaws.net
+      certificateArn: 'arn:aws:acm:us-east-1:927034868273:certificate/61e462bd-410e-48b6-95da-fa5501430d1d'
+      basePath: ''
+      stage: ${self:provider.stage}
+      createRoute53Record: true
+      enabled: true
+    production:
+      # TODO: Tweak this so it has the right properties for production, even if all pulled from env
+      domainName: ${self:service}-prod.dev.mozaws.net
+      certificateArn: 'arn:aws:acm:us-east-1:927034868273:certificate/61e462bd-410e-48b6-95da-fa5501430d1d'
+      basePath: ''
+      stage: ${self:provider.stage}
+      createRoute53Record: true
+      enabled: true
+
   remover:
     buckets:
       - ${self:custom.contentBucket}
@@ -39,7 +74,7 @@ custom:
 provider:
   name: aws
   runtime: nodejs8.10
-  stage: ${self:custom.localConfig.stage, opt:stage, 'dev'}
+  stage: ${env:STAGE, self:custom.localConfig.stage, opt:stage, 'dev'}
   region: us-east-1
   memorySize: 128
   iamRoleStatements:
