@@ -78,6 +78,21 @@ describe("functions/processQueueItem.handler", () => {
       }
     });
 
+    const putObjectCall = mocks.putObject.args[0][0];
+    expect(putObjectCall.Bucket).to.equal(CONTENT_BUCKET);
+    expect(putObjectCall.Key).to.equal(`${defaultMessage.image}-response.json`);
+    expect(putObjectCall.ContentType).to.equal("application/json");
+    expect(JSON.parse(putObjectCall.Body)).to.deep.equal({
+      id: defaultMessage.id,
+      user: defaultMessage.user,
+      negative_uri: defaultMessage.negative_uri,
+      positive_uri: defaultMessage.positive_uri,
+      positive_email: defaultMessage.positive_email,
+      notes: defaultMessage.notes,
+      image: defaultMessage.image,
+      response: positive ? positiveMatchResponse : negativeMatchResponse
+    });
+
     expect(mocks.getQueueUrl.lastCall.args[0]).to.deep.equal({
       QueueName: QUEUE_NAME
     });
@@ -142,6 +157,8 @@ const defaultMessage = {
   user: "devuser",
   negative_uri: "https://example.com/negative?id=123",
   positive_uri: "https://example.com/positive?id=123",
+  positive_email: "foo@example.com",
+  notes: "this is a test",
   image: "image-8675309"
 };
 

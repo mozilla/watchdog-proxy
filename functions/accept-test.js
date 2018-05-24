@@ -6,7 +6,7 @@ const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
 const {
   mocks,
   makePromiseFn,
-  env: { CREDENTIALS_TABLE, QUEUE_NAME, CONTENT_BUCKET },
+  env: { UPSTREAM_SERVICE_URL, CREDENTIALS_TABLE, QUEUE_NAME, CONTENT_BUCKET },
   constants: { QueueUrl, requestId }
 } = global;
 
@@ -192,9 +192,11 @@ describe("functions/accept.post", () => {
         body
       });
 
+      const imageKey = `image-${requestId}`;
+
       expect(mocks.putObject.args[0][0]).to.deep.equal({
         Bucket: CONTENT_BUCKET,
-        Key: `image-${requestId}`,
+        Key: imageKey,
         Body: new Buffer(imageContent),
         ContentType: imageContentType
       });
@@ -205,8 +207,23 @@ describe("functions/accept.post", () => {
       const message = mocks.sendMessage.args[0][0];
       const messageBody = JSON.parse(message.MessageBody);
 
-      expect(messageBody.id).to.equal(requestId);
       expect(message.QueueUrl).to.equal(QueueUrl);
+      expect("datestamp" in messageBody).to.be.true;
+      expect(messageBody.upstreamServiceUrl).to.equal(UPSTREAM_SERVICE_URL);
+      expect(messageBody.id).to.equal(requestId);
+      expect(messageBody.user).to.equal(id);
+      ["negative_uri", "positive_uri", "positive_email", "notes"].forEach(
+        name => expect(messageBody[name]).to.equal(body[name])
+      );
+      expect(messageBody.image).to.equal(imageKey);
+
+      expect(mocks.putObject.args[1][0]).to.deep.equal({
+        Bucket: CONTENT_BUCKET,
+        Key: `${imageKey}-request.json`,
+        Body: message.MessageBody,
+        ContentType: "application/json"
+      });
+
       expect(result.statusCode).to.equal(201);
     });
   });

@@ -29,9 +29,9 @@ module.exports.post = async function(event, context) {
     "X-Forwarded-Port": port = 80
   } = headers;
 
-  let credentials;
+  let authArtifacts;
   try {
-    ({ credentials } = await Hawk.server.authenticate(
+    ({ artifacts: authArtifacts } = await Hawk.server.authenticate(
       {
         method: "POST",
         url: path,
@@ -66,13 +66,6 @@ module.exports.post = async function(event, context) {
 
   const imageKey = `image-${requestId}`;
 
-  await S3.putObject({
-    Bucket,
-    Key: imageKey,
-    ContentType: image.contentType,
-    Body: image.data
-  }).promise();
-
   const upstreamServiceUrl =
     UPSTREAM_SERVICE_URL !== "__MOCK__"
       ? UPSTREAM_SERVICE_URL
@@ -82,20 +75,35 @@ module.exports.post = async function(event, context) {
         event.requestContext.stage +
         "/mock/upstream";
 
-  const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
-  await SQS.sendMessage({
-    QueueUrl,
-    MessageBody: JSON.stringify({
-      upstreamServiceUrl,
-      id: requestId,
-      user: credentials.id,
-      negative_uri,
-      positive_uri,
-      positive_email,
-      notes,
-      image: imageKey
-    })
+  const messageData = {
+    datestamp: new Date().toISOString(),
+    upstreamServiceUrl,
+    id: requestId,
+    user: authArtifacts.id,
+    negative_uri,
+    positive_uri,
+    positive_email,
+    notes,
+    image: imageKey
+  };
+  const MessageBody = JSON.stringify(messageData);
+
+  await S3.putObject({
+    Bucket,
+    Key: imageKey,
+    ContentType: image.contentType,
+    Body: image.data
   }).promise();
+
+  await S3.putObject({
+    Bucket,
+    Key: `${imageKey}-request.json`,
+    ContentType: "application/json",
+    Body: MessageBody
+  }).promise();
+
+  const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
+  await SQS.sendMessage({ QueueUrl, MessageBody }).promise();
 
   return response(201, {
     id: requestId,
