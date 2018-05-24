@@ -6,22 +6,26 @@ const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const request = require("request-promise-native");
 
 module.exports.handler = async function({ ReceiptHandle, Body }) {
-  const { QUEUE_NAME, CONTENT_BUCKET, UPSTREAM_SERVICE_KEY } = process.env;
+  const {
+    QUEUE_NAME,
+    CONTENT_BUCKET: Bucket,
+    UPSTREAM_SERVICE_KEY
+  } = process.env;
 
   const {
     upstreamServiceUrl,
     id,
-    // user,
+    user,
     negative_uri,
     positive_uri,
-    // positive_email,
-    // notes,
+    positive_email,
+    notes,
     image
   } = JSON.parse(Body);
 
   try {
     const imageUrl = S3.getSignedUrl("getObject", {
-      Bucket: CONTENT_BUCKET,
+      Bucket,
       Key: image
     });
 
@@ -37,6 +41,22 @@ module.exports.handler = async function({ ReceiptHandle, Body }) {
         Value: imageUrl
       }
     });
+
+    await S3.putObject({
+      Bucket,
+      Key: `${image}-response.json`,
+      ContentType: "application/json",
+      Body: JSON.stringify({
+        id,
+        user,
+        negative_uri,
+        positive_uri,
+        positive_email,
+        notes,
+        image,
+        response: upstreamServiceResponse
+      })
+    }).promise();
 
     await request.post({
       url: upstreamServiceResponse.IsMatch ? positive_uri : negative_uri,
