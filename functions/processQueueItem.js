@@ -42,24 +42,34 @@ module.exports.handler = async function({ ReceiptHandle, Body }) {
       }
     });
 
-    await S3.putObject({
-      Bucket,
-      Key: `${image}-response.json`,
-      ContentType: "application/json",
-      Body: JSON.stringify({
-        id,
-        user,
-        negative_uri,
-        positive_uri,
-        positive_email,
-        notes,
-        image,
-        response: upstreamServiceResponse
-      })
-    }).promise();
+    const { IsMatch } = upstreamServiceResponse;
+    if (!IsMatch) {
+      // On negative match, clean up the image and request details.
+      await Promise.all([
+        S3.deleteObject({ Bucket, Key: `${image}` }).promise(),
+        S3.deleteObject({ Bucket, Key: `${image}-request.json` }).promise()
+      ]);
+    } else {
+      // On positive match, store the details of the match response.
+      await S3.putObject({
+        Bucket,
+        Key: `${image}-response.json`,
+        ContentType: "application/json",
+        Body: JSON.stringify({
+          id,
+          user,
+          negative_uri,
+          positive_uri,
+          positive_email,
+          notes,
+          image,
+          response: upstreamServiceResponse
+        })
+      }).promise();
+    }
 
     await request.post({
-      url: upstreamServiceResponse.IsMatch ? positive_uri : negative_uri,
+      url: IsMatch ? positive_uri : negative_uri,
       headers: {
         "Content-Type": "application/json"
       },

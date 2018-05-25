@@ -26,6 +26,16 @@ describe("functions/processQueueItem.handler", () => {
       .onCall(1)
       .resolves({});
     await expectCommonItemProcessed(false);
+
+    const deleteCalls = mocks.deleteObject.args;
+    expect(deleteCalls[0][0]).to.deep.equal({
+      Bucket: CONTENT_BUCKET,
+      Key: `${defaultMessage.image}`
+    });
+    expect(deleteCalls[1][0]).to.deep.equal({
+      Bucket: CONTENT_BUCKET,
+      Key: `${defaultMessage.image}-request.json`
+    });
   });
 
   it("hits positive_uri on positive match from upstream service", async () => {
@@ -35,6 +45,21 @@ describe("functions/processQueueItem.handler", () => {
       .onCall(1)
       .resolves({});
     await expectCommonItemProcessed(true);
+
+    const putObjectCall = mocks.putObject.args[0][0];
+    expect(putObjectCall.Bucket).to.equal(CONTENT_BUCKET);
+    expect(putObjectCall.Key).to.equal(`${defaultMessage.image}-response.json`);
+    expect(putObjectCall.ContentType).to.equal("application/json");
+    expect(JSON.parse(putObjectCall.Body)).to.deep.equal({
+      id: defaultMessage.id,
+      user: defaultMessage.user,
+      negative_uri: defaultMessage.negative_uri,
+      positive_uri: defaultMessage.positive_uri,
+      positive_email: defaultMessage.positive_email,
+      notes: defaultMessage.notes,
+      image: defaultMessage.image,
+      response: positiveMatchResponse
+    });
   });
 
   const expectCommonItemProcessed = async positive => {
@@ -76,21 +101,6 @@ describe("functions/processQueueItem.handler", () => {
         watchdog_id: defaultMessage.id,
         positive
       }
-    });
-
-    const putObjectCall = mocks.putObject.args[0][0];
-    expect(putObjectCall.Bucket).to.equal(CONTENT_BUCKET);
-    expect(putObjectCall.Key).to.equal(`${defaultMessage.image}-response.json`);
-    expect(putObjectCall.ContentType).to.equal("application/json");
-    expect(JSON.parse(putObjectCall.Body)).to.deep.equal({
-      id: defaultMessage.id,
-      user: defaultMessage.user,
-      negative_uri: defaultMessage.negative_uri,
-      positive_uri: defaultMessage.positive_uri,
-      positive_email: defaultMessage.positive_email,
-      notes: defaultMessage.notes,
-      image: defaultMessage.image,
-      response: positive ? positiveMatchResponse : negativeMatchResponse
     });
 
     expect(mocks.getQueueUrl.lastCall.args[0]).to.deep.equal({
