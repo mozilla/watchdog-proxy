@@ -37,7 +37,7 @@
   "author": "Les Orchard <me@lmorchard.com>",
   "license": "MPL-2.0",
   "devDependencies": {
-    "aws-sdk": "2.243.1",
+    "aws-sdk": "2.248.1",
     "chai": "4.1.2",
     "commander": "2.15.1",
     "cross-env": "5.1.5",
