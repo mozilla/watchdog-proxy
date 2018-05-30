@@ -5,65 +5,42 @@ const DBD = new AWS.DynamoDB.DocumentClient();
 const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const Lambda = new AWS.Lambda({ apiVersion: "2015-03-31" });
 
-const { CONFIG_TABLE, QUEUE_NAME, PROCESS_QUEUE_FUNCTION } = process.env;
-
-const RATE_LIMIT = 5;
-const RATE_PERIOD = 1000;
-const MAX_LONG_POLL_PERIOD = 20;
-const POLL_DELAY = 100;
-const EXECUTION_MUTEX_KEY = "pollQueueExecutionExpires";
-const EXECUTION_MUTEX_TTL = 50 * 1000;
-
-const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
-
 // Running list of timestamps for hits on rate limit
-let rateHits = [];
+let rateHits;
 
 module.exports.handler = async function(event, context) {
-  const now = Date.now();
+  const constants = require("../lib/constants");
+  const { POLL_DELAY } = constants;
 
   try {
-    await DBD.put({
-      TableName: CONFIG_TABLE,
-      Item: {
-        key: EXECUTION_MUTEX_KEY,
-        value: now + EXECUTION_MUTEX_TTL
-      },
-      ConditionExpression: "#key <> :key OR (#key = :key AND #value < :value)",
-      ExpressionAttributeNames: { "#key": "key", "#value": "value" },
-      ExpressionAttributeValues: {
-        ":key": EXECUTION_MUTEX_KEY,
-        ":value": Date.now()
-      }
-    }).promise();
+    await acquireExecutionLock(process.env, constants);
   } catch (err) {
     console.warn("Could not acquire execution mutex", err);
     return;
   }
   console.info("Execution mutex acquired");
 
+  rateHits = [];
   let polls = 0;
-  console.log("Poller start");
-  do {
+  console.info("Poller start");
+  while (Math.floor(context.getRemainingTimeInMillis() / 1000) >= 1) {
     try {
       const tname = `pollQueue ${++polls}`;
       console.time(tname);
-      await pollQueue(context);
+      await pollQueue(process.env, constants, context);
       console.timeEnd(tname);
     } catch (err) {
       console.error("Error in pollQueue", err);
       return;
     }
+    console.info("Pausing for", POLL_DELAY, "ms");
     await wait(POLL_DELAY);
-    console.log("Remaining", context.getRemainingTimeInMillis(), "ms");
-  } while (Math.floor(context.getRemainingTimeInMillis() / 1000) > 1);
-  console.log("Poller exit");
+    console.info("Remaining", context.getRemainingTimeInMillis(), "ms");
+  }
+  console.info("Poller exit");
 
   try {
-    await DBD.delete({
-      TableName: CONFIG_TABLE,
-      Key: { key: EXECUTION_MUTEX_KEY }
-    }).promise();
+    await releaseExecutionLock(process.env, constants);
   } catch (err) {
     console.warn("Could not release execution mutex", err);
     return;
@@ -71,12 +48,45 @@ module.exports.handler = async function(event, context) {
   console.info("Execution mutex released");
 };
 
-async function pollQueue(context) {
+const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
+
+const acquireExecutionLock = (
+  { CONFIG_TABLE },
+  { EXECUTION_MUTEX_KEY, EXECUTION_MUTEX_TTL }
+) =>
+  DBD.put({
+    TableName: CONFIG_TABLE,
+    Item: {
+      key: EXECUTION_MUTEX_KEY,
+      value: Date.now() + EXECUTION_MUTEX_TTL
+    },
+    ConditionExpression: "#key <> :key OR (#key = :key AND #value < :value)",
+    ExpressionAttributeNames: { "#key": "key", "#value": "value" },
+    ExpressionAttributeValues: {
+      ":key": EXECUTION_MUTEX_KEY,
+      ":value": Date.now()
+    }
+  }).promise();
+
+const releaseExecutionLock = (
+  { CONFIG_TABLE },
+  { EXECUTION_MUTEX_KEY, EXECUTION_MUTEX_TTL }
+) =>
+  DBD.delete({
+    TableName: CONFIG_TABLE,
+    Key: { key: EXECUTION_MUTEX_KEY }
+  }).promise();
+
+async function pollQueue(
+  { QUEUE_NAME, PROCESS_QUEUE_FUNCTION },
+  { MAX_LONG_POLL_PERIOD, RATE_PERIOD, RATE_LIMIT },
+  context
+) {
   // Calculate seconds remaining for poller execution, using maximum for
   // long poll or whatever time we have left
   const WaitTimeSeconds = Math.min(
     MAX_LONG_POLL_PERIOD,
-    Math.floor(context.getRemainingTimeInMillis() / 1000) - 1
+    Math.floor(context.getRemainingTimeInMillis() / 1000)
   );
   if (WaitTimeSeconds <= 0) {
     console.log("Out of time");
