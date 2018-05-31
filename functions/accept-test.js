@@ -1,3 +1,4 @@
+const sinon = require("sinon");
 const { expect } = require("chai");
 const Hawk = require("hawk");
 
@@ -10,13 +11,21 @@ const {
   constants: { QueueUrl, requestId }
 } = global;
 
+const Metrics = require("../lib/metrics");
 const accept = require("./accept");
 
 describe("functions/accept.post", () => {
+  let metricsStub;
+
   beforeEach(() => {
     global.resetMocks();
     process.env.ENABLE_DEV_AUTH = "1";
     process.env.DISABLE_AUTH_CACHE = "1";
+    metricsStub = sinon.stub(Metrics, "newItem");
+  });
+
+  afterEach(() => {
+    metricsStub.restore();
   });
 
   describe("Hawk authentication", () => {
@@ -149,6 +158,8 @@ describe("functions/accept.post", () => {
       const body = Object.assign({}, DEFAULT_POST_BODY);
       delete body.image;
 
+      process.env.METRICS_URL = "https://example.com";
+
       const result = await acceptPost({
         httpMethod: "POST",
         proto: "https",
@@ -222,6 +233,13 @@ describe("functions/accept.post", () => {
         Key: `${imageKey}-request.json`,
         Body: message.MessageBody,
         ContentType: "application/json"
+      });
+
+      expect(metricsStub.called).to.be.true;
+      expect(metricsStub.args[0][0]).to.deep.include({
+        consumer_name: id,
+        watchdog_id: requestId,
+        type: imageContentType
       });
 
       expect(result.statusCode).to.equal(201);

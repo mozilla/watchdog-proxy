@@ -154,5 +154,6 @@ When using `serverless deploy` to deploy the stack, you can use several environm
 - `UPSTREAM_SERVICE_KEY` - the private subscription key for the upstream web service
 - `ENABLE_DEV_AUTH=1` - This enables a hardcoded user id / key for development (off by default)
 - `DISABLE_AUTH_CACHE=1` - Authentication credentials are cached in memory in the `accept` API function. This lasts until AWS recycles the container hosting the function. Setting this variable disables the cache.
+- `METRICS_URL` - Override for Ping Centre service URL used for internal metrics. By default, the stage or production Ping Centre URL is used based on `NODE_ENV`
 
 You can see these variables used by scripts defined in `package.json` for development convenience.

@@ -254,3 +254,11 @@ functions:
       - http:
           path: mock/client/positive
           method: post
+
+  mockLogPost:
+    handler: functions/mockEndpoints.logPost
+    name: ${self:custom.prefix}-mockLogPost
+    events:
+      - http:
+          path: mock/log
+          method: post

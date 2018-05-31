@@ -23,6 +23,11 @@ module.exports.clientPositivePost = async (event, context) => {
   return response(200, { status: "OK" });
 };
 
+module.exports.logPost = async (event, context) => {
+  console.log("body", event.body);
+  return response(200, { status: "OK" });
+};
+
 function response(statusCode, body, headers = {}) {
   return {
     statusCode,

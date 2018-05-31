@@ -4,13 +4,19 @@ const AWS = require("aws-sdk");
 const DBD = new AWS.DynamoDB.DocumentClient();
 const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const Lambda = new AWS.Lambda({ apiVersion: "2015-03-31" });
+const Metrics = require("../lib/metrics");
 
 // Running list of timestamps for hits on rate limit
 let rateHits;
+// Last time heartbeat metrics were sent, for throttling
+let lastHeartbeat;
 
 module.exports.handler = async function(event, context) {
   const constants = require("../lib/constants");
   const { POLL_DELAY } = constants;
+
+  rateHits = [];
+  lastHeartbeat = false;
 
   try {
     await acquireExecutionLock(process.env, constants);
@@ -20,7 +26,12 @@ module.exports.handler = async function(event, context) {
   }
   console.info("Execution mutex acquired");
 
-  rateHits = [];
+  try {
+    await sendHeartbeatMetrics(process.env, context);
+  } catch (err) {
+    console.warn("Failed to send initial heartbeat metrics", err);
+  }
+
   let polls = 0;
   console.info("Poller start");
   while (Math.floor(context.getRemainingTimeInMillis() / 1000) >= 1) {
@@ -33,6 +44,13 @@ module.exports.handler = async function(event, context) {
       console.error("Error in pollQueue", err);
       return;
     }
+
+    try {
+      await maybeSendHeartbeatMetrics(process.env, constants, context);
+    } catch (err) {
+      console.warn("Failed to send periodic heartbeat metrics", err);
+    }
+
     console.info("Pausing for", POLL_DELAY, "ms");
     await wait(POLL_DELAY);
     console.info("Remaining", context.getRemainingTimeInMillis(), "ms");
@@ -46,6 +64,12 @@ module.exports.handler = async function(event, context) {
     return;
   }
   console.info("Execution mutex released");
+
+  try {
+    await sendHeartbeatMetrics(process.env, context);
+  } catch (err) {
+    console.warn("Failed to send final heartbeat metrics", err);
+  }
 };
 
 const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
@@ -76,6 +100,47 @@ const releaseExecutionLock = (
     TableName: CONFIG_TABLE,
     Key: { key: EXECUTION_MUTEX_KEY }
   }).promise();
+
+// Throttle sending heartbeat metrics
+const maybeSendHeartbeatMetrics = async (env, constants, context) => {
+  if (
+    lastHeartbeat !== false &&
+    Date.now() - lastHeartbeat < constants.MIN_HEARTBEAT_PERIOD
+  ) {
+    console.info("Skipping heartbeat metrics ping", Date.now() - lastHeartbeat);
+    return;
+  }
+  await sendHeartbeatMetrics(env, context);
+};
+
+const sendHeartbeatMetrics = async (
+  { QUEUE_NAME },
+  { awsRequestId: poller_id }
+) => {
+  console.info("Sending heartbeat metrics");
+  lastHeartbeat = Date.now();
+  const { QueueUrl } = await SQS.getQueueUrl({
+    QueueName: QUEUE_NAME
+  }).promise();
+  const {
+    ApproximateNumberOfMessages: items_in_queue,
+    ApproximateNumberOfMessagesDelayed: items_in_waiting,
+    ApproximateNumberOfMessagesNotVisible: items_in_progress
+  } = await SQS.getQueueAttributes({
+    QueueUrl,
+    AttributeNames: [
+      "ApproximateNumberOfMessages",
+      "ApproximateNumberOfMessagesDelayed",
+      "ApproximateNumberOfMessagesNotVisible"
+    ]
+  }).promise();
+  await Metrics.pollerHeartbeat({
+    poller_id,
+    items_in_queue,
+    items_in_progress,
+    items_in_waiting
+  });
+};
 
 async function pollQueue(
   { QUEUE_NAME, PROCESS_QUEUE_FUNCTION },

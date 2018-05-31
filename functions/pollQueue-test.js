@@ -10,8 +10,11 @@ const {
   constantsModule
 } = global;
 
+const awsRequestId = "test-uuid";
+
 const { EXECUTION_MUTEX_KEY, RATE_LIMIT } = global.constantsModule;
 
+const Metrics = require("../lib/metrics");
 const pollQueue = require("./pollQueue");
 
 const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
@@ -21,13 +24,17 @@ describe("functions/pollQueue.handler", () => {
 
   const logMethods = ["log", "warn", "info", "time", "timeEnd"];
 
+  let metricsStub;
+
   beforeEach(() => {
     resetMocks();
     logMethods.forEach(name => sinon.spy(console, name));
+    metricsStub = sinon.stub(Metrics, "pollerHeartbeat");
   });
 
   afterEach(() => {
     logMethods.forEach(name => console[name].restore());
+    metricsStub.restore();
   });
 
   it("should exit if another instance is already running", async () => {
@@ -47,12 +54,13 @@ describe("functions/pollQueue.handler", () => {
       "Could not acquire execution mutex",
       "Fail"
     ]);
+    expect(metricsStub.callCount).to.equal(0);
   });
 
   it("should exit when remaining execution time is close to exhausted", async () => {
     const getRemainingTimeInMillis = sinon.stub().returns(500);
 
-    await subject({}, { getRemainingTimeInMillis });
+    await subject({}, { awsRequestId, getRemainingTimeInMillis });
 
     expect(mocks.putItem.called).to.be.true;
     const putArg = mocks.putItem.firstCall.args[0];
@@ -64,10 +72,14 @@ describe("functions/pollQueue.handler", () => {
     const infoArgs = console.info.args.map(([msg]) => msg);
     expect(infoArgs).to.deep.equal([
       "Execution mutex acquired",
+      "Sending heartbeat metrics",
       "Poller start",
       "Poller exit",
-      "Execution mutex released"
+      "Execution mutex released",
+      "Sending heartbeat metrics"
     ]);
+
+    expect(metricsStub.callCount).to.equal(2);
 
     expect(mocks.deleteItem.called).to.be.true;
     const deleteArg = mocks.deleteItem.firstCall.args[0];
@@ -91,9 +103,9 @@ describe("functions/pollQueue.handler", () => {
       POLL_DELAY: 10
     });
 
-    await subject({}, { getRemainingTimeInMillis });
+    await subject({}, { awsRequestId, getRemainingTimeInMillis });
 
-    expect(mocks.getQueueUrl.callCount).to.equal(1);
+    expect(mocks.getQueueUrl.called).to.be.true;
     expect(mocks.getQueueUrl.lastCall.args[0]).to.deep.equal({
       QueueName: QUEUE_NAME
     });
@@ -116,12 +128,24 @@ describe("functions/pollQueue.handler", () => {
     const infoArgs = console.info.args.map(([msg]) => msg);
     expect(infoArgs).to.deep.equal([
       "Execution mutex acquired",
+      "Sending heartbeat metrics",
       "Poller start",
+      "Sending heartbeat metrics",
       "Pausing for",
       "Remaining",
       "Poller exit",
-      "Execution mutex released"
+      "Execution mutex released",
+      "Sending heartbeat metrics"
     ]);
+
+    expect(metricsStub.callCount).to.equal(3);
+    const metricsCall = metricsStub.args[0][0];
+    expect(metricsCall.poller_id).to.equal(awsRequestId);
+    expect(metricsCall).to.include.keys(
+      "items_in_queue",
+      "items_in_progress",
+      "items_in_waiting"
+    );
 
     const timeEndArgs = console.timeEnd.args.map(([msg]) => msg);
     expect(timeEndArgs).to.deep.equal([
@@ -163,7 +187,7 @@ describe("functions/pollQueue.handler", () => {
       .callsFake(() => limitTime - Date.now());
 
     const startTime = Date.now();
-    await subject({}, { getRemainingTimeInMillis });
+    await subject({}, { awsRequestId, getRemainingTimeInMillis });
     const endTime = Date.now();
 
     const duration = endTime - startTime;
