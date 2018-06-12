@@ -1,3 +1,4 @@
+const sinon = require("sinon");
 const { expect } = require("chai");
 
 const {
@@ -11,12 +12,21 @@ const {
   constants: { QueueUrl, ReceiptHandle }
 } = global;
 
-// NOTE: Import the test subject as late as possible so that the mocks work
+const awsRequestId = "test-uuid";
+
+const Metrics = require("../lib/metrics");
 const processQueueItem = require("./processQueueItem");
 
 describe("functions/processQueueItem.handler", () => {
+  let metricsStub;
+
   beforeEach(() => {
     global.resetMocks();
+    metricsStub = sinon.stub(Metrics, "workerWorks");
+  });
+
+  afterEach(() => {
+    metricsStub.restore();
   });
 
   it("hits negative_uri on negative match from upstream service", async () => {
@@ -65,10 +75,11 @@ describe("functions/processQueueItem.handler", () => {
   const expectCommonItemProcessed = async positive => {
     const Body = makeBody();
     const signedImageUrl = "https://example.s3.amazonaws.com/someimage";
+    process.env.METRICS_URL = "https://example.com";
 
     mocks.getSignedUrl.returns(signedImageUrl);
 
-    await processQueueItem.handler({ ReceiptHandle, Body });
+    await processQueueItem.handler({ ReceiptHandle, Body }, { awsRequestId });
 
     expect(mocks.getSignedUrl.lastCall.args).to.deep.equal([
       "getObject",
@@ -111,6 +122,22 @@ describe("functions/processQueueItem.handler", () => {
       QueueUrl,
       ReceiptHandle
     });
+
+    const response = positive ? positiveMatchResponse : negativeMatchResponse;
+    expect(metricsStub.called).to.be.true;
+    expect(metricsStub.args[0][0]).to.deep.include({
+      consumer_name: defaultMessage.user,
+      worker_id: awsRequestId,
+      watchdog_id: defaultMessage.id,
+      photodna_tracking_id: response.TrackingId,
+      is_error: false,
+      is_match: response.IsMatch
+    });
+    expect(metricsStub.args[0][0]).to.include.keys(
+      "timing_sent",
+      "timing_received",
+      "timing_submitted"
+    );
   };
 });
 

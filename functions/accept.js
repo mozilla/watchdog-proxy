@@ -7,6 +7,7 @@ const S3 = new AWS.S3({ apiVersion: "2006-03-01" });
 const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const documentClient = new AWS.DynamoDB.DocumentClient();
 const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
+const Metrics = require("../lib/metrics");
 
 const REQUIRED_FIELDS = ["image", "negative_uri", "positive_uri"];
 
@@ -104,6 +105,12 @@ module.exports.post = async function(event, context) {
 
   const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
   await SQS.sendMessage({ QueueUrl, MessageBody }).promise();
+
+  await Metrics.newItem({
+    consumer_name: authArtifacts.id,
+    watchdog_id: requestId,
+    type: image.contentType
+  });
 
   return response(201, {
     id: requestId,
