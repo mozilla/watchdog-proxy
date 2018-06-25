@@ -9,7 +9,7 @@
     "deploy:master": "cross-env STAGE=dev DOMAIN=dev NODE_ENV=development ENABLE_DEV_AUTH=1 UPSTREAM_SERVICE_URL=__MOCK__ UPSTREAM_SERVICE_KEY=__MOCK__ METRICS_URL=https://watchdog-proxy.dev.mozaws.net/mock/log serverless deploy",
     "info": "serverless info",
     "lint": "npm-run-all lint:*",
-    "lint:js": "eslint functions lib test",
+    "lint:js": "eslint functions lib",
     "prettier": "prettier --write \"{functions,lib,bin}/**/*.js\"",
     "logs": "serverless logs",
     "postlint": "nsp check -o summary",
