@@ -36,7 +36,9 @@ Note: images in the S3 bucket are not currently deleted, though objects in the b
 - `npm run deploy:dev` - deploy a stack configured for development (e.g. with `ENABLE_DEV_AUTH=1`)
 - `npm run info` - display information about the currently deployed stack (e.g. handy for checking the stack's API URL)
 - `npm run logs -- -f accept -t` - watch logs for the function `accept`
-- `npm run client -- [--id <id> --key <key>] <url>` - make an authenticated request to `<url>` using Hawk credentials, defaults to dev credentials devuser / devkey enabled with `ENABLE_DEV_AUTH` env var on deploy
+- `npm run client -- [--id <id> --key <key> --url <url>]` - make an authenticated request, defaults to an auto-detected service URL for your stack with credentials devuser / devkey
+- `npm run client -- --url https://watchdog-proxy.dev.mozaws.net` - make an authenticated request to the dev stack
+- `npm run client -- --help` - see further options accepted by the client
 
 ### Quickstart Notes
 
