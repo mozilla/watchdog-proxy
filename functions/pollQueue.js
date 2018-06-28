@@ -122,11 +122,7 @@ const sendHeartbeatMetrics = async (
   const { QueueUrl } = await SQS.getQueueUrl({
     QueueName: QUEUE_NAME
   }).promise();
-  const {
-    ApproximateNumberOfMessages: items_in_queue,
-    ApproximateNumberOfMessagesDelayed: items_in_waiting,
-    ApproximateNumberOfMessagesNotVisible: items_in_progress
-  } = await SQS.getQueueAttributes({
+  const attribsResult = await SQS.getQueueAttributes({
     QueueUrl,
     AttributeNames: [
       "ApproximateNumberOfMessages",
@@ -134,6 +130,12 @@ const sendHeartbeatMetrics = async (
       "ApproximateNumberOfMessagesNotVisible"
     ]
   }).promise();
+  const {
+    ApproximateNumberOfMessages: items_in_queue,
+    ApproximateNumberOfMessagesDelayed: items_in_waiting,
+    ApproximateNumberOfMessagesNotVisible: items_in_progress
+  } =
+    attribsResult.Attributes || {};
   await Metrics.pollerHeartbeat({
     poller_id,
     items_in_queue,
