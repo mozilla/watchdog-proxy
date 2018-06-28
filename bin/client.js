@@ -13,7 +13,7 @@ async function main() {
   program
     .version(packageData.version)
     .usage("[options]")
-    .option("-U, --url <url>", "Service URL (auto-detected by default)")
+    .option("-U, --url <url>", "Service base URL (auto-detected by default)")
     .option("-u, --id <id>", "User id")
     .option("-k, --key <key>", "User key")
     .option("-i, --image <path>", "Image path")
@@ -23,21 +23,16 @@ async function main() {
     .option("-e, --email <email>", "Email for positives")
     .parse(process.argv);
 
-  let url = program.url;
-  if (!url) {
-    const endpointURL = await discoverEndpointURL();
-    url = `${endpointURL}/accept`;
-  }
+  const endpointURL = await discoverEndpointURL(program);
+  let url = `${endpointURL}/accept`;
 
   let negative_uri = program.negative;
   if (!negative_uri) {
-    const endpointURL = await discoverEndpointURL();
     negative_uri = `${endpointURL}/mock/client/negative`;
   }
 
   let positive_uri = program.positive;
   if (!positive_uri) {
-    const endpointURL = await discoverEndpointURL();
     positive_uri = `${endpointURL}/mock/client/positive`;
   }
 
@@ -75,7 +70,10 @@ async function main() {
   });
 }
 
-async function discoverEndpointURL() {
+async function discoverEndpointURL(program) {
+  if (program.url) {
+    return program.url;
+  }
   if (!endpointURL) {
     // Attempt to discover the current stack's accept URL if missing option
     const Serverless = require("serverless");

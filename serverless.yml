@@ -70,6 +70,7 @@ custom:
       QUEUE_NAME: ${self:custom.sqs}
       CONTENT_BUCKET: ${self:custom.contentBucket}
       PROCESS_QUEUE_FUNCTION: ${self:custom.process}
+      METRICS_URL: ${env:METRICS_URL,""}
 
 provider:
   name: aws
@@ -127,7 +128,7 @@ resources:
           Rules:
             - Id: DailyCleanup
               Status: Enabled
-              ExpirationInDays: 30
+              ExpirationInDays: 180
 
     Messages:
       Type: AWS::SQS::Queue

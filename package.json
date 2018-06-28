@@ -6,7 +6,7 @@
     "precommit": "lint-staged && npm run test:js",
     "deploy": "cross-env NODE_ENV=production serverless deploy",
     "deploy:dev": "cross-env NODE_ENV=development ENABLE_DEV_AUTH=1 serverless deploy",
-    "deploy:master": "cross-env STAGE=dev DOMAIN=dev NODE_ENV=development ENABLE_DEV_AUTH=1 UPSTREAM_SERVICE_URL=__MOCK__ UPSTREAM_SERVICE_KEY=__MOCK__ METRICS_URL=https://watchdog-proxy.dev.mozaws.net/mock/log serverless deploy",
+    "deploy:master": "cross-env STAGE=dev DOMAIN=dev NODE_ENV=development ENABLE_DEV_AUTH=1 UPSTREAM_SERVICE_URL=https://watchdog-proxy.dev.mozaws.net/mock/upstream UPSTREAM_SERVICE_KEY=__MOCK__ METRICS_URL=https://watchdog-proxy.dev.mozaws.net/mock/log serverless deploy",
     "info": "serverless info",
     "lint": "npm-run-all lint:*",
     "lint:js": "eslint functions lib",
