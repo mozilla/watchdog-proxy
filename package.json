@@ -39,7 +39,7 @@
   "devDependencies": {
     "aws-sdk": "2.263.1",
     "chai": "4.1.2",
-    "commander": "2.15.1",
+    "commander": "2.16.0",
     "cross-env": "5.2.0",
     "eslint": "5.0.0",
     "eslint-plugin-mozilla": "0.14.0",
