@@ -2,16 +2,28 @@
 
 const AWS = require("aws-sdk");
 const S3 = new AWS.S3({ apiVersion: "2006-03-01" });
-const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
+const documentClient = new AWS.DynamoDB.DocumentClient();
 const request = require("request-promise-native");
+const { RATE_LIMIT, RATE_PERIOD, RATE_WAIT } = require("../lib/constants");
 const Metrics = require("../lib/metrics");
 
-module.exports.handler = async function(
-  { ReceiptHandle, Body },
-  { awsRequestId }
-) {
+exports.handler = async function({ Records }, context) {
+  console.log("Received", Records.length, "messages to process");
+  const results = [];
+  for (let idx = 0; idx < Records.length; idx++) {
+    const result = await exports.handleOne(Records[idx], context);
+    results.push(result);
+  }
+  console.log("Finished processing batch of", results.length, "messages");
+  return results;
+};
+
+const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
+const epochNow = () => Math.floor(Date.now() / 1000);
+
+exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
   const {
-    QUEUE_NAME,
+    HITRATE_TABLE,
     CONTENT_BUCKET: Bucket,
     UPSTREAM_SERVICE_KEY
   } = process.env;
@@ -26,9 +38,42 @@ module.exports.handler = async function(
     positive_email,
     notes,
     image
-  } = JSON.parse(Body);
+  } = JSON.parse(body);
+
+  console.log("Processing queue item", id);
 
   try {
+    // Pause if we're at the rate limit for current expiration window
+    let rateLimited = false;
+    do {
+      const data = await documentClient
+        .scan({
+          TableName: HITRATE_TABLE,
+          FilterExpression: "expiresAt > :now",
+          ExpressionAttributeValues: { ":now": epochNow() }
+        })
+        .promise();
+      if (data.Count >= RATE_LIMIT) {
+        console.log("Pausing for rate limit", epochNow());
+        rateLimited = true;
+        await wait(RATE_WAIT);
+      } else {
+        rateLimited = false;
+      }
+    } while (rateLimited);
+
+    // Count the current request in hitrate
+    await documentClient
+      .put({
+        TableName: HITRATE_TABLE,
+        Item: {
+          id,
+          timestamp: epochNow(),
+          expiresAt: epochNow() + Math.floor(RATE_PERIOD / 1000)
+        }
+      })
+      .promise();
+
     const imageUrl = S3.getSignedUrl("getObject", {
       Bucket,
       Key: image
@@ -91,12 +136,6 @@ module.exports.handler = async function(
     });
     const timingSubmitted = Date.now() - timingSubmittedStart;
 
-    const { QueueUrl } = await SQS.getQueueUrl({
-      QueueName: QUEUE_NAME
-    }).promise();
-
-    await SQS.deleteMessage({ QueueUrl, ReceiptHandle }).promise();
-
     await Metrics.workerWorks({
       consumer_name: user,
       worker_id: awsRequestId,
@@ -108,7 +147,10 @@ module.exports.handler = async function(
       timing_received: timingReceived,
       timing_submitted: timingSubmitted
     });
+
+    return id;
   } catch (err) {
     console.log("REQUEST ERROR", err);
+    throw err;
   }
 };
