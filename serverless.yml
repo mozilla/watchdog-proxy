@@ -141,7 +141,7 @@ resources:
             Fn::GetAtt:
             - MessagesDeadLetterQueue
             - Arn
-          maxReceiveCount: 10
+          maxReceiveCount: 3
 
     MessagesDeadLetterQueue:
       Type: AWS::SQS::Queue
