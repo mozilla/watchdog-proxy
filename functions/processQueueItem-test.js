@@ -2,14 +2,10 @@ const sinon = require("sinon");
 const { expect } = require("chai");
 
 const {
+  makePromiseFn,
   mocks,
-  env: {
-    QUEUE_NAME,
-    CONTENT_BUCKET,
-    UPSTREAM_SERVICE_URL,
-    UPSTREAM_SERVICE_KEY
-  },
-  constants: { QueueUrl, ReceiptHandle }
+  env: { CONTENT_BUCKET, UPSTREAM_SERVICE_URL, UPSTREAM_SERVICE_KEY },
+  constants: { ReceiptHandle }
 } = global;
 
 const awsRequestId = "test-uuid";
@@ -72,14 +68,42 @@ describe("functions/processQueueItem.handler", () => {
     });
   });
 
+  it("pauses for rate limiting", async () => {
+    // Mock the hitrate table, but only the first three should matter.
+    mocks.scanItems
+      .onCall(0)
+      .returns(makePromiseFn({ Count: 3 }))
+      .onCall(1)
+      .returns(makePromiseFn({ Count: 2 }))
+      .onCall(2)
+      .returns(makePromiseFn({ Count: 1 }))
+      .onCall(3)
+      .returns(makePromiseFn({ Count: 1 }));
+
+    mocks.requestPost
+      .onCall(0)
+      .resolves(negativeMatchResponse)
+      .onCall(1)
+      .resolves({});
+
+    await expectCommonItemProcessed(false);
+
+    // Scan should be called 3 times to reflect pausing for rate limit.
+    const scanCalls = mocks.scanItems.args;
+    expect(scanCalls.length).to.equal(3);
+  });
+
   const expectCommonItemProcessed = async positive => {
-    const Body = makeBody();
+    const body = makeBody();
     const signedImageUrl = "https://example.s3.amazonaws.com/someimage";
     process.env.METRICS_URL = "https://example.com";
 
     mocks.getSignedUrl.returns(signedImageUrl);
 
-    await processQueueItem.handler({ ReceiptHandle, Body }, { awsRequestId });
+    await processQueueItem.handler(
+      { Records: [ { receiptHandle: ReceiptHandle, body } ] },
+      { awsRequestId }
+    );
 
     expect(mocks.getSignedUrl.lastCall.args).to.deep.equal([
       "getObject",
@@ -112,15 +136,6 @@ describe("functions/processQueueItem.handler", () => {
         watchdog_id: defaultMessage.id,
         positive
       }
-    });
-
-    expect(mocks.getQueueUrl.lastCall.args[0]).to.deep.equal({
-      QueueName: QUEUE_NAME
-    });
-
-    expect(mocks.deleteMessage.lastCall.args[0]).to.deep.equal({
-      QueueUrl,
-      ReceiptHandle
     });
 
     const response = positive ? positiveMatchResponse : negativeMatchResponse;
