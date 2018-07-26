@@ -1,0 +1,59 @@
+custom:
+  customDomain:
+    enabled: false
+
+  resourceNames:
+    hitrate: ${env:HITRATE_TABLE}
+    credentials: ${env:CREDENTIALS_TABLE}
+    sqs: ${env:QUEUE_NAME}
+    sqsArn: ${env:QUEUE_ARN}
+    contentBucket: ${env:CONTENT_BUCKET}
+    process: ${self:custom.prefix}-processQueueItem
+
+  remover: {}
+
+resources:
+  Resources: {}
+
+provider:
+  iamRoleStatements: {}
+
+functions:
+
+  version:
+    handler: functions/version.handler
+    name: ${self:custom.prefix}-version
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: __version__
+          method: get
+
+  heartbeat:
+    handler: functions/heartbeat.handler
+    name: ${self:custom.prefix}-heartbeat
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: __heartbeat__
+          method: get
+
+  accept:
+    handler: functions/accept.post
+    name: ${self:custom.prefix}-accept
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: accept
+          method: post
+
+  processQueueItem:
+    timeout: 60
+    handler: functions/processQueueItem.handler
+    name: ${self:custom.resourceNames.process}
+    environment: ${self:custom.fnEnv}
+    reservedConcurrency: 5
+    events:
+      - sqs:
+          batchSize: 5
+          arn: ${self:custom.resourceNames.sqsArn}
