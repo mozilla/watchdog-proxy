@@ -8,7 +8,7 @@ module.exports.upstreamPost = async (event, context) => {
       {},
       baseMatchResponse,
       // TODO: Find a more deterministic way to simulate pos/neg match
-      { IsMatch: Math.random() < 0.5 }
+      { IsMatch: Math.random() < 0.1 }
     )
   );
 };
