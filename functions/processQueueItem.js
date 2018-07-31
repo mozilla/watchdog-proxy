@@ -2,6 +2,7 @@
 
 const AWS = require("aws-sdk");
 const S3 = new AWS.S3({ apiVersion: "2006-03-01" });
+const SES = new AWS.SES({ apiVersion: "2010-12-01" });
 const documentClient = new AWS.DynamoDB.DocumentClient();
 const request = require("request-promise-native");
 const { RATE_LIMIT, RATE_PERIOD, RATE_WAIT } = require("../lib/constants");
@@ -21,11 +22,55 @@ exports.handler = async function({ Records }, context) {
 const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
 const epochNow = () => Math.floor(Date.now() / 1000);
 
+const emailSubject = ({ id, user }) =>
+  `[watchdog-proxy] Positive match for ${user} (${id})`;
+
+const emailBody = ({
+  id,
+  datestamp,
+  user,
+  notes,
+  imageUrl,
+  requestUrl,
+  responseUrl,
+  expirationDate,
+  upstreamServiceResponse
+}) => `
+Watchdog ID:
+${id}
+
+Client application:
+${user}
+
+Datestamp:
+${datestamp}
+
+Notes:
+${notes}
+
+Match metadata:
+${JSON.stringify(upstreamServiceResponse, null, " ")}
+
+NOTE: The following URLs will expire and stop working after ${expirationDate}.
+
+Image URL:
+${imageUrl}
+
+Request JSON:
+${requestUrl}
+
+Response JSON:
+${responseUrl}
+`;
+
 exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
   const {
     HITRATE_TABLE,
     CONTENT_BUCKET: Bucket,
-    UPSTREAM_SERVICE_KEY
+    UPSTREAM_SERVICE_KEY,
+    EMAIL_FROM,
+    EMAIL_TO,
+    EMAIL_EXPIRES
   } = process.env;
 
   const {
@@ -120,6 +165,63 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
           response: upstreamServiceResponse
         })
       }).promise();
+
+      // Send an email alert on positive match, if addresses are available.
+      const ToAddresses = [];
+      if (positive_email) {
+        ToAddresses.push(positive_email);
+      }
+      if (EMAIL_TO) {
+        ToAddresses.push(EMAIL_TO);
+      }
+      if (EMAIL_FROM && ToAddresses.length) {
+        const imageUrl = S3.getSignedUrl("getObject", {
+          Bucket,
+          Key: image,
+          Expires: EMAIL_EXPIRES
+        });
+        const requestUrl = S3.getSignedUrl("getObject", {
+          Bucket,
+          Key: `${image}-request.json`,
+          Expires: EMAIL_EXPIRES
+        });
+        const responseUrl = S3.getSignedUrl("getObject", {
+          Bucket,
+          Key: `${image}-response.json`,
+          Expires: EMAIL_EXPIRES
+        });
+        const expirationDate = new Date(
+          Date.now() + (parseInt(EMAIL_EXPIRES) * 1000)
+        ).toISOString();
+        const emailParams = {
+          Source: EMAIL_FROM,
+          Destination: { ToAddresses },
+          Message: {
+            Subject: {
+              Charset: "UTF-8",
+              Data: emailSubject({ id, user })
+            },
+            Body: {
+              Text: {
+                Charset: "UTF-8",
+                Data: emailBody({
+                  id,
+                  datestamp,
+                  user,
+                  notes,
+                  imageUrl,
+                  requestUrl,
+                  responseUrl,
+                  expirationDate,
+                  upstreamServiceResponse
+                })
+              }
+            }
+          }
+        };
+        const emailResult = await SES.sendEmail(emailParams).promise();
+        console.log(`Sent notification email (${emailResult.MessageId})`);
+      }
     }
 
     const timingSubmittedStart = Date.now();
