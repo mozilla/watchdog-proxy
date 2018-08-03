@@ -1,0 +1,207 @@
+custom:
+  resourceNames:
+    hitrate: ${self:custom.prefix}-hitrate
+    credentials: ${self:custom.prefix}-credentials
+    sqs: ${self:custom.prefix}-messages
+    contentBucket: ${self:custom.prefix}-content
+    process: ${self:custom.prefix}-processQueueItem
+
+  customDomain:
+    domainName: ${self:service}.dev.mozaws.net
+    certificateArn: 'arn:aws:acm:us-east-1:927034868273:certificate/61e462bd-410e-48b6-95da-fa5501430d1d'
+    basePath: ''
+    stage: ${self:provider.stage}
+    createRoute53Record: true
+    enabled: true
+
+  remover:
+    buckets:
+      - ${self:custom.resourceNames.contentBucket}
+
+provider:
+  iamRoleStatements:
+  - Effect: Allow
+    Action:
+      - ses:SendEmail
+    Resource:
+      - arn:aws:ses:*:*:*
+  - Effect: Allow
+    Action:
+      - dynamodb:GetItem
+      - dynamodb:PutItem
+      - dynamodb:DeleteItem
+      - dynamodb:UpdateItem
+      - dynamodb:Query
+      - dynamodb:Scan
+    Resource:
+      - arn:aws:dynamodb:*:*:table/${self:custom.resourceNames.credentials}
+      - arn:aws:dynamodb:*:*:table/${self:custom.resourceNames.hitrate}
+  - Effect: Allow
+    Action:
+      - lambda:InvokeFunction
+    Resource: arn:aws:lambda:*:*:function:${self:custom.resourceNames.process}
+  - Effect: Allow
+    Action:
+      - sqs:ChangeMessageVisibility
+      - sqs:ChangeMessageVisibilityBatch
+      - sqs:DeleteMessage
+      - sqs:DeleteMessageBatch
+      - sqs:GetQueueAttributes
+      - sqs:GetQueueUrl
+      - sqs:ReceiveMessage
+      - sqs:SendMessage
+      - sqs:SendMessageBatch
+    Resource: arn:aws:sqs:*:*:${self:custom.resourceNames.sqs}
+  - Effect: Allow
+    Action:
+      - s3:GetObject
+      - s3:PutObject
+      - s3:PutObjectAcl
+      - s3:DeleteObject
+      - s3:ListBucket
+    Resource:
+      - arn:aws:s3:::${self:custom.resourceNames.contentBucket}
+      - arn:aws:s3:::${self:custom.resourceNames.contentBucket}/*
+
+resources:
+  Resources:
+
+    S3BucketContent:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.resourceNames.contentBucket}
+        LifecycleConfiguration:
+          Rules:
+            - Id: DailyCleanup
+              Status: Enabled
+              ExpirationInDays: 180
+
+    Messages:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.resourceNames.sqs}
+        MessageRetentionPeriod: 1209600
+        VisibilityTimeout: 60
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+            - MessagesDeadLetterQueue
+            - Arn
+          maxReceiveCount: 3
+
+    MessagesDeadLetterQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.resourceNames.sqs}-dead-letter-queue
+        MessageRetentionPeriod: 1209600
+
+    HitRate:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.resourceNames.hitrate}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
+
+    Credentials:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.resourceNames.credentials}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+functions:
+
+  version:
+    handler: functions/version.handler
+    name: ${self:custom.prefix}-version
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: __version__
+          method: get
+
+  heartbeat:
+    handler: functions/heartbeat.handler
+    name: ${self:custom.prefix}-heartbeat
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: __heartbeat__
+          method: get
+
+  accept:
+    handler: functions/accept.post
+    name: ${self:custom.prefix}-accept
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: accept
+          method: post
+
+  processQueueItem:
+    timeout: 60
+    handler: functions/processQueueItem.handler
+    name: ${self:custom.resourceNames.process}
+    environment: ${self:custom.fnEnv}
+    reservedConcurrency: 5
+    events:
+      - sqs:
+          batchSize: 5
+          arn:
+            Fn::GetAtt:
+              - Messages
+              - Arn
+
+  # TODO: Find a way to exclude these functions from prod deployments
+  # See https://stackoverflow.com/questions/47718004/exclude-lambda-function-from-deploy-to-a-particular-stage
+  mockUpstream:
+    handler: functions/mockEndpoints.upstreamPost
+    name: ${self:custom.prefix}-mockUpstream
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: mock/upstream
+          method: post
+
+  mockClientNegative:
+    handler: functions/mockEndpoints.clientNegativePost
+    name: ${self:custom.prefix}-mockClientNegative
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: mock/client/negative
+          method: post
+
+  mockClientPositive:
+    handler: functions/mockEndpoints.clientPositivePost
+    name: ${self:custom.prefix}-mockClientPositive
+    environment: ${self:custom.fnEnv}
+    events:
+      - http:
+          path: mock/client/positive
+          method: post
+
+  mockLogPost:
+    handler: functions/mockEndpoints.logPost
+    name: ${self:custom.prefix}-mockLogPost
+    events:
+      - http:
+          path: mock/log
+          method: post

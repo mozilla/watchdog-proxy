@@ -52,11 +52,12 @@ npm start
 
 After cloning the repository and installing dependencies, `npm start` will launch several file watchers that build assets as needed, run unit tests, and check code quality as you edit files.
 
-Now, create your own version of `serverless.local.yml`:
+For local development, create your own version of `serverless.local.yml`:
 1. Copy `serverless.local.yml-dist` to `serverless.local.yml`
 1. Edit `serverless.local.yml`
 1. Change at least the `stage` property to a name that's unique to you
-1. (optional) Change `upstreamService.url` to the URL of a debugging service like webhook.site
+
+You don't need to create this file if you intend to use environment variables to configure deployment. In fact, this file will override many environment variables if you use it.
 
 The next step is to get the service running on AWS. You'll need to [sign up for an account](https://aws.amazon.com/) or [request a Dev IAM account from Mozilla Cloud Operations](https://mana.mozilla.org/wiki/display/SVCOPS/Requesting+A+Dev+IAM+account+from+Cloud+Operations). (The latter is available only to Mozillians.)
 
@@ -146,11 +147,16 @@ Read this Serverless Blog post for more details: https://serverless.com/blog/ser
 
 ### Environment variables
 
-When using `serverless deploy` to deploy the stack, you can use several environment variables to alter configuration:
+When using `serverless deploy` to deploy the stack, you can use several environment variables to alter configuration. Note that many of these are currently overridden by a `serverless.local.yml` file, if present.
 
-- `STAGE` - Stage for building and deploying - e.g. `dev`, `stage`, `production`
-- `DOMAIN` - Custom domain config selection for Route 53 and CloudFront distribution - e.g. `local`, `dev`, `stage`, `production`. If omitted, custom domain handling is disabled
+- `STAGE` - Stage for building and deploying - one of `dev`, `stage`, or `production`
 - `NODE_ENV` - Use `production` for a more optimized production build, `development` for a development build with more verbose logging and other conveniences
+- `PREFIX` - a prefix string used in constructing the names of resources and functions, by default a combination of service and stage names
+- `HITRATE_TABLE` - name of the DynamoDB table used for tracking rate limiting, overrides the automatically named default value
+- `CREDENTIALS_TABLE` - name of the DynamoDB table containing user credentials, overrides the automatically named default value
+- `QUEUE_NAME` - name of the SQS queue used to manage incoming jobs, overrides the automatically named default value
+- `QUEUE_ARN` - ARN of the SQS queue used to manage incoming jobs - might seem redundant with `QUEUE_NAME`, but it's required for `production` stage to trigger the `processQueueItem` function with SQS events (done automatically for `dev` stage)
+- `CONTENT_BUCKET` - name of the S3 bucket used for storing images and job results, overrides the automatically named default value
 - `GIT_COMMIT` - The value reported by the `__version__` resource as `commit`. If not set, Serverless config will attempt to run the `git` command to discover the current commit.
 - `EMAIL_FROM` - email address from which alerts on positive matches are sent, *must be verified in AWS SES*
 - `EMAIL_TO` - email address to which all alerts on positive matches will be sent (along with positive_email parameter in requests), blank by default
@@ -163,3 +169,23 @@ When using `serverless deploy` to deploy the stack, you can use several environm
 - `METRICS_URL` - Override for Ping Centre service URL used for internal metrics. By default, the stage or production Ping Centre URL is used based on `NODE_ENV`
 
 You can see these variables used by scripts defined in `package.json` for development convenience.
+
+#### Production deployment
+
+For a production deployment involving just the functions and no other resources, define most resources using environment variables like so:
+
+```
+STAGE=production \
+NODE_ENV=production \
+PREFIX=watchdog \
+HITRATE_TABLE=$PREFIX-hitrate \
+CREDENTIALS_TABLE=$PREFIX-credentials \
+CONTENT_BUCKET=watchdog-content \
+QUEUE_NAME=$PREFIX-messages \
+QUEUE_ARN=arn:aws:sqs:$AWS_REGION:$AWS_ACCOUNT_ID:$QUEUE_NAME \
+UPSTREAM_SERVICE_URL=https://api.microsoftmoderator.com/photodna/v1.0/Match \
+UPSTREAM_SERVICE_KEY={secret service key} \
+npm run deploy
+```
+
+This should select [the `production` config settings][./config/production.yml], which defines functions but omits resources or IAM statements. So, all those dependencies should be created separately and identified via environmnent variables.
