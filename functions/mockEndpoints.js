@@ -1,6 +1,7 @@
 "use strict";
 
 module.exports.upstreamPost = async (event, context) => {
+  const { MOCK_POSITIVE_CHANCE = 0.1 } = process.env;
   console.log("upstream", event.body);
   return response(
     200,
@@ -8,7 +9,7 @@ module.exports.upstreamPost = async (event, context) => {
       {},
       baseMatchResponse,
       // TODO: Find a more deterministic way to simulate pos/neg match
-      { IsMatch: Math.random() < 0.1 }
+      { IsMatch: Math.random() < parseFloat(MOCK_POSITIVE_CHANCE) }
     )
   );
 };

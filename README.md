@@ -152,10 +152,14 @@ When using `serverless deploy` to deploy the stack, you can use several environm
 - `DOMAIN` - Custom domain config selection for Route 53 and CloudFront distribution - e.g. `local`, `dev`, `stage`, `production`. If omitted, custom domain handling is disabled
 - `NODE_ENV` - Use `production` for a more optimized production build, `development` for a development build with more verbose logging and other conveniences
 - `GIT_COMMIT` - The value reported by the `__version__` resource as `commit`. If not set, Serverless config will attempt to run the `git` command to discover the current commit.
+- `EMAIL_FROM` - email address from which alerts on positive matches are sent, *must be verified in AWS SES*
+- `EMAIL_TO` - email address to which all alerts on positive matches will be sent (along with positive_email parameter in requests), blank by default
+- `EMAIL_EXPIRES` - number of seconds for which links in a positive alert email should remain valid, defaults to one month (2592000 seconds)
 - `UPSTREAM_SERVICE_URL` - the URL of the production upstream web service (i.e. PhotoDNA)
 - `UPSTREAM_SERVICE_KEY` - the private subscription key for the upstream web service
 - `ENABLE_DEV_AUTH=1` - This enables a hardcoded user id / key for development (off by default)
 - `DISABLE_AUTH_CACHE=1` - Authentication credentials are cached in memory in the `accept` API function. This lasts until AWS recycles the container hosting the function. Setting this variable disables the cache.
+- `MOCK_POSITIVE_CHANCE` - a number from 0.0 to 1.0 representing the probability that the mock upstream endpoint will respond with a positive match
 - `METRICS_URL` - Override for Ping Centre service URL used for internal metrics. By default, the stage or production Ping Centre URL is used based on `NODE_ENV`
 
 You can see these variables used by scripts defined in `package.json` for development convenience.

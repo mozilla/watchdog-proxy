@@ -33,6 +33,8 @@ describe("functions/processQueueItem.handler", () => {
       .resolves({});
     await expectCommonItemProcessed(false);
 
+    expect(mocks.sendEmail.called).to.be.false;
+
     const deleteCalls = mocks.deleteObject.args;
     expect(deleteCalls[0][0]).to.deep.equal({
       Bucket: CONTENT_BUCKET,
@@ -45,6 +47,16 @@ describe("functions/processQueueItem.handler", () => {
   });
 
   it("hits positive_uri on positive match from upstream service", async () => {
+    const {
+      id,
+      user,
+      negative_uri,
+      positive_uri,
+      positive_email,
+      notes,
+      image
+    } = defaultMessage;
+
     mocks.requestPost
       .onCall(0)
       .resolves(positiveMatchResponse)
@@ -52,18 +64,33 @@ describe("functions/processQueueItem.handler", () => {
       .resolves({});
     await expectCommonItemProcessed(true);
 
+    expect(mocks.sendEmail.called).to.be.true;
+    const sendEmailCall = mocks.sendEmail.args[0][0];
+    expect(sendEmailCall).to.deep.include({
+      Source: global.env.EMAIL_FROM,
+      Destination: {
+        ToAddresses: [defaultMessage.positive_email]
+      }
+    });
+    [id, user].forEach(v =>
+      expect(sendEmailCall.Message.Subject.Data).to.include(v)
+    );
+    [id, user, notes].forEach(v =>
+      expect(sendEmailCall.Message.Body.Text.Data).to.include(v)
+    );
+
     const putObjectCall = mocks.putObject.args[0][0];
     expect(putObjectCall.Bucket).to.equal(CONTENT_BUCKET);
     expect(putObjectCall.Key).to.equal(`${defaultMessage.image}-response.json`);
     expect(putObjectCall.ContentType).to.equal("application/json");
     expect(JSON.parse(putObjectCall.Body)).to.deep.equal({
-      id: defaultMessage.id,
-      user: defaultMessage.user,
-      negative_uri: defaultMessage.negative_uri,
-      positive_uri: defaultMessage.positive_uri,
-      positive_email: defaultMessage.positive_email,
-      notes: defaultMessage.notes,
-      image: defaultMessage.image,
+      id,
+      user,
+      negative_uri,
+      positive_uri,
+      positive_email,
+      notes,
+      image,
       response: positiveMatchResponse
     });
   });
@@ -95,17 +122,27 @@ describe("functions/processQueueItem.handler", () => {
 
   const expectCommonItemProcessed = async positive => {
     const body = makeBody();
-    const signedImageUrl = "https://example.s3.amazonaws.com/someimage";
+    const signedImageUrl = "https://example.s3.amazonaws.com/some-image";
+    const signedRequestUrl = "https://example.s3.amazonaws.com/some-request";
+    const signedResponseUrl = "https://example.s3.amazonaws.com/some-response";
     process.env.METRICS_URL = "https://example.com";
 
-    mocks.getSignedUrl.returns(signedImageUrl);
+    mocks.getSignedUrl
+      .onCall(0)
+      .returns(signedImageUrl)
+      .onCall(1)
+      .returns(signedImageUrl)
+      .onCall(2)
+      .returns(signedRequestUrl)
+      .onCall(3)
+      .returns(signedResponseUrl);
 
     await processQueueItem.handler(
-      { Records: [ { receiptHandle: ReceiptHandle, body } ] },
+      { Records: [{ receiptHandle: ReceiptHandle, body }] },
       { awsRequestId }
     );
 
-    expect(mocks.getSignedUrl.lastCall.args).to.deep.equal([
+    expect(mocks.getSignedUrl.args[0]).to.deep.equal([
       "getObject",
       {
         Bucket: CONTENT_BUCKET,
@@ -204,6 +241,7 @@ const positiveMatchResponse = {
 };
 
 const defaultMessage = {
+  datestamp: "2018-07-31T12:00:00Z",
   upstreamServiceUrl: UPSTREAM_SERVICE_URL,
   id: "8675309",
   user: "devuser",
