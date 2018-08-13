@@ -52,7 +52,7 @@
     "nsp": "3.2.1",
     "onchange": "4.1.0",
     "prettier": "1.14.2",
-    "serverless": "1.29.2",
+    "serverless": "1.30.0",
     "serverless-apigw-binary": "0.4.4",
     "serverless-domain-manager": "2.6.0",
     "serverless-s3-remover": "0.5.0",
