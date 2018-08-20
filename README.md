@@ -188,4 +188,33 @@ UPSTREAM_SERVICE_KEY={secret service key} \
 npm run deploy
 ```
 
-This should select [the `production` config settings][./config/production.yml], which defines functions but omits resources or IAM statements. So, all those dependencies should be created separately and identified via environmnent variables.
+This should select [the `production` config settings](./config/production.yml), which defines functions but omits resources or IAM statements. So, all those dependencies should be created separately and identified via environmnent variables.
+
+## Managing client credentials
+
+Managing client credentials for [Hawk authentication][] is currently a manual
+process of direct edits to the Credentials table in Dynamo DB - no tooling has
+been created for this yet.
+
+Each item in the Credentials table consists of these properties:
+
+* `id` -the client's ID
+* `key` - a secret key
+* `algorithm` - the HMAC hash algorithm to use
+
+The `id` and `key` properties are mandatory and should both be unique values.
+Neither of these are hashed, since the Hawk algorithm requires access to them
+in plaintext. The `id` value will appear in log messages and metric pings, but
+`key` should remain secret.
+
+The `algorithm` property is optional - if empty, a default of "`sha256`" will
+be used. The `algorithm` used should be given to the client implementor along with
+the `id` and `key`, because it is necessary as part of constructing a Hawk auth
+request.
+
+The set of alternate values for `algorithm` are described as part of the
+[`crypto.createHmac` function](https://nodejs.org/api/crypto.html#crypto_crypto_createhmac_algorithm_key_options) supplied by node.js - TL;DR:
+
+> The algorithm is dependent on the available algorithms supported by the version of OpenSSL on the platform. Examples are 'sha256', 'sha512', etc. On recent releases of OpenSSL, openssl list -digest-algorithms (openssl list-message-digest-algorithms for older versions of OpenSSL) will display the available digest algorithms.
+
+[hawk authentication]: https://github.com/hueniverse/hawk#readme
