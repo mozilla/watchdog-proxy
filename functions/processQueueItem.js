@@ -191,7 +191,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
           Expires: EMAIL_EXPIRES
         });
         const expirationDate = new Date(
-          Date.now() + (parseInt(EMAIL_EXPIRES) * 1000)
+          Date.now() + parseInt(EMAIL_EXPIRES) * 1000
         ).toISOString();
         const emailParams = {
           Source: EMAIL_FROM,
