@@ -26,7 +26,7 @@ application.
 This project uses Ping Centre to collect metrics data.  Pings will be sent as
 JSON blobs.  All pings will include the following fields:
 - *topic*: used by Ping Centre. In this case always "watchdog-proxy": string
-- *timestamp*: Using the toISOString() standard: string
+- *timestamp*: Using UNIX epoch time in milliseconds (i.e. `Date.now()` in JavaScript): number
 
 
 ## Events
@@ -42,7 +42,7 @@ Example:
 ```
 {
   "topic": "watchdog-proxy",
-  "timestamp": "2018-05-18T16:38:33.464Z",
+  "timestamp": "1534784298646",
 
   "consumer_name": "screenshots",
   "event": "new_item",
@@ -73,7 +73,7 @@ Example:
 ```
 {
   "topic": "watchdog-proxy",
-  "timestamp": "2018-05-18T16:38:33.464Z",
+  "timestamp": "1534784298646",
 
   "event": "poller_heartbeat",
   "poller_id": "31417de1-b3ef-4e90-be3c-e5116d459d1d",
@@ -100,7 +100,7 @@ Example:
 ```
 {
   "topic": "watchdog-proxy",
-  "timestamp": "2018-05-18T16:38:33.464Z",
+  "timestamp": "1534784298646",
 
   "event": "worker_works",
   "worker_id": "8cdb1e6b-7e15-489d-b171-e7a05781c5da",
