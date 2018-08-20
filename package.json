@@ -57,7 +57,7 @@
     "serverless-domain-manager": "2.6.0",
     "serverless-s3-remover": "0.5.0",
     "serverless-sqs-alarms-plugin": "0.1.7",
-    "sinon": "6.1.4"
+    "sinon": "6.1.5"
   },
   "dependencies": {
     "busboy": "0.2.14",
