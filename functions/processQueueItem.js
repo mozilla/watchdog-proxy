@@ -175,21 +175,22 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         ToAddresses.push(EMAIL_TO);
       }
       if (EMAIL_FROM && ToAddresses.length) {
-        const imageUrl = S3.getSignedUrl("getObject", {
+        const commonUrlParams = {
           Bucket,
-          Key: image,
-          Expires: EMAIL_EXPIRES
-        });
-        const requestUrl = S3.getSignedUrl("getObject", {
-          Bucket,
-          Key: `${image}-request.json`,
-          Expires: EMAIL_EXPIRES
-        });
-        const responseUrl = S3.getSignedUrl("getObject", {
-          Bucket,
-          Key: `${image}-response.json`,
-          Expires: EMAIL_EXPIRES
-        });
+          Expires: parseInt(EMAIL_EXPIRES, 10) || 60 * 60 * 24 * 30
+        };
+        const imageUrl = S3.getSignedUrl(
+          "getObject",
+          Object.assign({ Key: image }, commonUrlParams)
+        );
+        const requestUrl = S3.getSignedUrl(
+          "getObject",
+          Object.assign({ Key: `${image}-request.json` }, commonUrlParams)
+        );
+        const responseUrl = S3.getSignedUrl(
+          "getObject",
+          Object.assign({ Key: `${image}-response.json` }, commonUrlParams)
+        );
         const expirationDate = new Date(
           Date.now() + parseInt(EMAIL_EXPIRES) * 1000
         ).toISOString();
