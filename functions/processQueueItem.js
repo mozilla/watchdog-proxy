@@ -85,6 +85,21 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     image
   } = JSON.parse(body);
 
+  // Start constructing metrics ping data here, so that if there are any
+  // exceptions we can at least send out a partially filled-in ping with
+  // is_error: true
+  const metricsPing = {
+    consumer_name: user,
+    worker_id: awsRequestId,
+    watchdog_id: id,
+    photodna_tracking_id: null,
+    is_match: false,
+    is_error: false,
+    timing_sent: null,
+    timing_received: null,
+    timing_submitted: null
+  };
+
   console.log("Processing queue item", id);
 
   try {
@@ -124,7 +139,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       Key: image
     });
 
-    const timingSent = Date.now() - Date.parse(datestamp);
+    metricsPing.timing_sent = Date.now() - Date.parse(datestamp);
 
     const timingReceivedStart = Date.now();
     const upstreamServiceResponse = await request.post({
@@ -139,9 +154,12 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         Value: imageUrl
       }
     });
-    const timingReceived = Date.now() - timingReceivedStart;
+    metricsPing.timing_received = Date.now() - timingReceivedStart;
+    metricsPing.photodna_tracking_id = upstreamServiceResponse.TrackingId;
 
     const { IsMatch } = upstreamServiceResponse;
+    metricsPing.is_match = IsMatch;
+
     if (!IsMatch) {
       // On negative match, clean up the image and request details.
       await Promise.all([
@@ -236,23 +254,13 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         positive: upstreamServiceResponse.IsMatch
       }
     });
-    const timingSubmitted = Date.now() - timingSubmittedStart;
-
-    await Metrics.workerWorks({
-      consumer_name: user,
-      worker_id: awsRequestId,
-      watchdog_id: id,
-      photodna_tracking_id: upstreamServiceResponse.TrackingId,
-      is_error: false,
-      is_match: upstreamServiceResponse.IsMatch,
-      timing_sent: timingSent,
-      timing_received: timingReceived,
-      timing_submitted: timingSubmitted
-    });
-
-    return id;
+    metricsPing.timing_submitted = Date.now() - timingSubmittedStart;
   } catch (err) {
+    metricsPing.is_error = true;
     console.log("REQUEST ERROR", err);
     throw err;
   }
+
+  await Metrics.workerWorks(metricsPing);
+  return id;
 };
