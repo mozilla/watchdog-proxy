@@ -19,6 +19,8 @@ custom:
   fnEnv:
       NODE_ENV: ${env:NODE_ENV,"production"}
       GIT_COMMIT: ${self:custom.dynamicConfig.GIT_COMMIT}
+      LOG_INFO: ${env:LOG_INFO, "1"}
+      LOG_DEBUG: ${env:LOG_DEBUG, "0"}
       DISABLE_AUTH_CACHE: ${env:DISABLE_AUTH_CACHE, "0"}
       ENABLE_DEV_AUTH: ${env:ENABLE_DEV_AUTH,"0"}
       UPSTREAM_SERVICE_URL: ${env:UPSTREAM_SERVICE_URL, self:custom.localConfig.upstreamService.url}

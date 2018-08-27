@@ -146,6 +146,7 @@ describe("functions/processQueueItem.handler", () => {
       "getObject",
       {
         Bucket: CONTENT_BUCKET,
+        Expires: 600,
         Key: defaultMessage.image
       }
     ]);
@@ -171,6 +172,8 @@ describe("functions/processQueueItem.handler", () => {
       json: true,
       body: {
         watchdog_id: defaultMessage.id,
+        notes: defaultMessage.notes,
+        response: positive ? positiveMatchResponse : negativeMatchResponse,
         positive
       }
     });
