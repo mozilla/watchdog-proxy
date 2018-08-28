@@ -186,7 +186,7 @@ UPSTREAM_SERVICE_KEY={secret service key} \
 npm run deploy
 ```
 
-This should select [the `production` config settings](./config/production.yml), which defines functions but omits resources or IAM statements. So, all those dependencies should be created separately and identified via environmnent variables.
+This should select [the `production` config settings](./config/production.yml), which defines functions but omits resources or IAM statements. So, all those dependencies should be created separately and identified via environment variables.
 
 ## Managing client credentials
 
