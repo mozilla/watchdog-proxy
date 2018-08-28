@@ -7,15 +7,16 @@ const documentClient = new AWS.DynamoDB.DocumentClient();
 const request = require("request-promise-native");
 const { RATE_LIMIT, RATE_PERIOD, RATE_WAIT } = require("../lib/constants");
 const Metrics = require("../lib/metrics");
+const { logDebug, logInfo, jsonPretty } = require("../lib/utils.js");
 
 exports.handler = async function({ Records }, context) {
-  console.log("Received", Records.length, "messages to process");
+  logInfo("Received", Records.length, "messages to process");
   const results = [];
   for (let idx = 0; idx < Records.length; idx++) {
     const result = await exports.handleOne(Records[idx], context);
     results.push(result);
   }
-  console.log("Finished processing batch of", results.length, "messages");
+  logInfo("Finished processing batch of", results.length, "messages");
   return results;
 };
 
@@ -73,6 +74,20 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     EMAIL_EXPIRES
   } = process.env;
 
+  logDebug(
+    "env",
+    jsonPretty({
+      HITRATE_TABLE,
+      Bucket,
+      EMAIL_FROM,
+      EMAIL_TO,
+      EMAIL_EXPIRES
+    })
+  );
+
+  const parsedBody = JSON.parse(body);
+  logDebug("parsedBody", jsonPretty(parsedBody));
+
   const {
     datestamp,
     upstreamServiceUrl,
@@ -83,7 +98,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     positive_email,
     notes,
     image
-  } = JSON.parse(body);
+  } = parsedBody;
 
   // Start constructing metrics ping data here, so that if there are any
   // exceptions we can at least send out a partially filled-in ping with
@@ -100,7 +115,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     timing_submitted: null
   };
 
-  console.log("Processing queue item", id);
+  logInfo("Processing queue item", id);
 
   try {
     // Pause if we're at the rate limit for current expiration window
@@ -113,8 +128,11 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
           ExpressionAttributeValues: { ":now": epochNow() }
         })
         .promise();
+
+      logDebug("hitRateData", jsonPretty(data));
+
       if (data.Count >= RATE_LIMIT) {
-        console.log("Pausing for rate limit", epochNow());
+        logInfo("Pausing for rate limit", epochNow());
         rateLimited = true;
         await wait(RATE_WAIT);
       } else {
@@ -123,7 +141,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     } while (rateLimited);
 
     // Count the current request in hitrate
-    await documentClient
+    const hitRatePutResult = await documentClient
       .put({
         TableName: HITRATE_TABLE,
         Item: {
@@ -134,10 +152,15 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       })
       .promise();
 
+    logDebug("hitRatePutResult", jsonPretty(hitRatePutResult));
+
     const imageUrl = S3.getSignedUrl("getObject", {
       Bucket,
-      Key: image
+      Key: image,
+      Expires: 600 // 5 minutes
     });
+
+    logDebug("imageUrl", imageUrl);
 
     metricsPing.timing_sent = Date.now() - Date.parse(datestamp);
 
@@ -157,18 +180,21 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     metricsPing.timing_received = Date.now() - timingReceivedStart;
     metricsPing.photodna_tracking_id = upstreamServiceResponse.TrackingId;
 
+    logDebug("upstreamServiceResponse", jsonPretty(upstreamServiceResponse));
+
     const { IsMatch } = upstreamServiceResponse;
     metricsPing.is_match = IsMatch;
 
     if (!IsMatch) {
       // On negative match, clean up the image and request details.
-      await Promise.all([
+      const deleteResult = await Promise.all([
         S3.deleteObject({ Bucket, Key: `${image}` }).promise(),
         S3.deleteObject({ Bucket, Key: `${image}-request.json` }).promise()
       ]);
+      logDebug("deleteResult", jsonPretty(deleteResult));
     } else {
       // On positive match, store the details of the match response.
-      await S3.putObject({
+      const putResult = await S3.putObject({
         Bucket,
         Key: `${image}-response.json`,
         ContentType: "application/json",
@@ -184,6 +210,8 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         })
       }).promise();
 
+      logDebug("putResult", jsonPretty(putResult));
+
       // Send an email alert on positive match, if addresses are available.
       const ToAddresses = [];
       if (positive_email) {
@@ -193,25 +221,28 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         ToAddresses.push(EMAIL_TO);
       }
       if (EMAIL_FROM && ToAddresses.length) {
-        const commonUrlParams = {
+        const imageUrl = S3.getSignedUrl("getObject", {
           Bucket,
-          Expires: parseInt(EMAIL_EXPIRES, 10) || 60 * 60 * 24 * 30
-        };
-        const imageUrl = S3.getSignedUrl(
-          "getObject",
-          Object.assign({ Key: image }, commonUrlParams)
-        );
-        const requestUrl = S3.getSignedUrl(
-          "getObject",
-          Object.assign({ Key: `${image}-request.json` }, commonUrlParams)
-        );
-        const responseUrl = S3.getSignedUrl(
-          "getObject",
-          Object.assign({ Key: `${image}-response.json` }, commonUrlParams)
-        );
+          Key: image,
+          Expires: EMAIL_EXPIRES
+        });
+
+        const requestUrl = S3.getSignedUrl("getObject", {
+          Bucket,
+          Key: `${image}-request.json`,
+          Expires: EMAIL_EXPIRES
+        });
+
+        const responseUrl = S3.getSignedUrl("getObject", {
+          Bucket,
+          Key: `${image}-response.json`,
+          Expires: EMAIL_EXPIRES
+        });
+
         const expirationDate = new Date(
           Date.now() + parseInt(EMAIL_EXPIRES) * 1000
         ).toISOString();
+
         const emailParams = {
           Source: EMAIL_FROM,
           Destination: { ToAddresses },
@@ -238,13 +269,16 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
             }
           }
         };
+        logDebug("emailParams", jsonPretty(emailParams));
+
         const emailResult = await SES.sendEmail(emailParams).promise();
-        console.log(`Sent notification email (${emailResult.MessageId})`);
+        logDebug("emailResult", jsonPretty(emailResult));
+        logInfo(`Sent notification email (${emailResult.MessageId})`);
       }
     }
 
     const timingSubmittedStart = Date.now();
-    await request.post({
+    const callbackResult = await request.post({
       url: IsMatch ? positive_uri : negative_uri,
       headers: {
         "Content-Type": "application/json"
@@ -252,16 +286,20 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       json: true,
       body: {
         watchdog_id: id,
-        positive: upstreamServiceResponse.IsMatch
+        positive: upstreamServiceResponse.IsMatch,
+        notes,
+        response: upstreamServiceResponse
       }
     });
     metricsPing.timing_submitted = Date.now() - timingSubmittedStart;
+    logDebug("callbackResult", jsonPretty(callbackResult));
   } catch (err) {
     metricsPing.is_error = true;
-    console.log("REQUEST ERROR", err);
+    logInfo("REQUEST ERROR", err);
     throw err;
   }
 
-  await Metrics.workerWorks(metricsPing);
+  const metricsResult = await Metrics.workerWorks(metricsPing);
+  logDebug("metricsResult", jsonPretty(metricsResult));
   return id;
 };

@@ -8,6 +8,7 @@ const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const documentClient = new AWS.DynamoDB.DocumentClient();
 const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
 const Metrics = require("../lib/metrics");
+const { logDebug, logInfo, jsonPretty } = require("../lib/utils.js");
 
 const REQUIRED_FIELDS = ["image", "negative_uri", "positive_uri"];
 
@@ -18,17 +19,31 @@ module.exports.post = async function(event, context) {
     CONTENT_BUCKET: Bucket
   } = process.env;
 
+  logDebug(
+    "env",
+    jsonPretty({
+      UPSTREAM_SERVICE_URL,
+      QueueName,
+      Bucket
+    })
+  );
+
   const {
     headers,
     queryStringParameters: params,
     requestContext: { path, requestId }
   } = event;
 
+  logInfo("Accepting job", requestId);
+  logDebug("event", jsonPretty({ headers, params, path, requestId }));
+
   const {
     Host: host,
     Authorization: authorization,
     "X-Forwarded-Port": port = 80
   } = headers;
+
+  logDebug("headers", jsonPretty({ host, authorization, port }));
 
   let authArtifacts;
   try {
@@ -43,6 +58,7 @@ module.exports.post = async function(event, context) {
       },
       lookupCredentials
     ));
+    logDebug("auth", jsonPretty({ authArtifacts }));
   } catch (err) {
     return response(
       401,
@@ -61,11 +77,14 @@ module.exports.post = async function(event, context) {
     });
     // TODO: More input validation here?
     ({ negative_uri, positive_uri, positive_email, notes, image } = body);
+    logDebug("body", jsonPretty(body));
   } catch (err) {
     return response(400, { error: err.message });
   }
 
   const imageKey = `image-${requestId}`;
+
+  logDebug("imageKey", imageKey);
 
   const upstreamServiceUrl =
     UPSTREAM_SERVICE_URL !== "__MOCK__"
@@ -75,6 +94,8 @@ module.exports.post = async function(event, context) {
         "/" +
         event.requestContext.stage +
         "/mock/upstream";
+
+  logDebug("upstreamServiceUrl", upstreamServiceUrl);
 
   const messageData = {
     datestamp: new Date().toISOString(),
@@ -89,35 +110,58 @@ module.exports.post = async function(event, context) {
   };
   const MessageBody = JSON.stringify(messageData);
 
-  await S3.putObject({
+  logDebug("MessageBody", MessageBody);
+
+  const imagePutResult = await S3.putObject({
     Bucket,
     Key: imageKey,
     ContentType: image.contentType,
     Body: image.data
   }).promise();
 
-  await S3.putObject({
+  logDebug("imagePutResult", jsonPretty(imagePutResult));
+
+  const requestPutResult = await S3.putObject({
     Bucket,
     Key: `${imageKey}-request.json`,
     ContentType: "application/json",
     Body: MessageBody
   }).promise();
 
-  const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
-  await SQS.sendMessage({ QueueUrl, MessageBody }).promise();
+  logDebug("requestPutResult", jsonPretty(requestPutResult));
 
-  await Metrics.newItem({
+  const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
+  const queueSendResult = await SQS.sendMessage({
+    QueueUrl,
+    MessageBody
+  }).promise();
+
+  logDebug(
+    "queueSendResult",
+    jsonPretty({
+      QueueUrl,
+      queueSendResult
+    })
+  );
+
+  const metricsResult = await Metrics.newItem({
     consumer_name: authArtifacts.id,
     watchdog_id: requestId,
     type: image.contentType
   });
 
-  return response(201, {
+  logDebug("metricsResult", jsonPretty(metricsResult));
+
+  const responseData = {
     id: requestId,
     negative_uri,
     positive_uri,
     positive_email
-  });
+  };
+
+  logDebug("responseData", jsonPretty(responseData));
+
+  return response(201, responseData);
 };
 
 function response(statusCode, body, headers = {}) {
