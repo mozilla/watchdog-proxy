@@ -147,6 +147,8 @@ Read this Serverless Blog post for more details: https://serverless.com/blog/ser
 
 When using `serverless deploy` to deploy the stack, you can use several environment variables to alter configuration. Note that many of these are currently overridden by a `serverless.local.yml` file, if present.
 
+- `LOG_INFO` - set to "1" for informational log output, "0" to disable (default: "1")
+- `LOG_DEBUG` - set to "1" for verbose debug log output, "0" to disable (default: "0")
 - `STAGE` - Stage for building and deploying - one of `dev`, `stage`, or `production`
 - `NODE_ENV` - Use `production` for a more optimized production build, `development` for a development build with more verbose logging and other conveniences
 - `PREFIX` - a prefix string used in constructing the names of resources and functions, by default a combination of service and stage names
