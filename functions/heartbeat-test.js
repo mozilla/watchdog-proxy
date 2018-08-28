@@ -10,6 +10,6 @@ describe("functions/heartbeat.handler", () => {
       httpMethod: "GET"
     });
     expect(result.statusCode).to.equal(200);
-    expect(result.body).to.equal("OK");
+    expect(JSON.parse(result.body)).to.deep.equal({ status: "OK" });
   });
 });
