@@ -8,7 +8,7 @@ const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const documentClient = new AWS.DynamoDB.DocumentClient();
 const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
 const Metrics = require("../lib/metrics");
-const { logDebug, logInfo, jsonPretty } = require("../lib/utils.js");
+const { logDebug, logInfo, jsonPretty, md5 } = require("../lib/utils.js");
 
 const REQUIRED_FIELDS = ["image", "negative_uri", "positive_uri"];
 
@@ -77,7 +77,22 @@ module.exports.post = async function(event, context) {
     });
     // TODO: More input validation here?
     ({ negative_uri, positive_uri, positive_email, notes, image } = body);
-    logDebug("body", jsonPretty(body));
+
+    logDebug(
+      "body",
+      jsonPretty({
+        negative_uri,
+        positive_uri,
+        positive_email,
+        notes,
+        image: {
+          filename: image.filename,
+          contentEncoding: image.contentEncoding,
+          contentType: image.contentType,
+          dataMD5: md5(image.data || "")
+        }
+      })
+    );
   } catch (err) {
     return response(400, { error: err.message });
   }
