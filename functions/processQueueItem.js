@@ -221,26 +221,27 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         ToAddresses.push(EMAIL_TO);
       }
       if (EMAIL_FROM && ToAddresses.length) {
+        const URL_TTL_IN_SEC = parseInt(EMAIL_EXPIRES, 10);
         const imageUrl = S3.getSignedUrl("getObject", {
           Bucket,
           Key: image,
-          Expires: EMAIL_EXPIRES
+          Expires: URL_TTL_IN_SEC
         });
 
         const requestUrl = S3.getSignedUrl("getObject", {
           Bucket,
           Key: `${image}-request.json`,
-          Expires: EMAIL_EXPIRES
+          Expires: URL_TTL_IN_SEC
         });
 
         const responseUrl = S3.getSignedUrl("getObject", {
           Bucket,
           Key: `${image}-response.json`,
-          Expires: EMAIL_EXPIRES
+          Expires: URL_TTL_IN_SEC
         });
 
         const expirationDate = new Date(
-          Date.now() + parseInt(EMAIL_EXPIRES) * 1000
+          Date.now() + URL_TTL_IN_SEC * 1000
         ).toISOString();
 
         const emailParams = {
