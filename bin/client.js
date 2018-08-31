@@ -1,10 +1,7 @@
-#!/usr/bin/env node
 const fs = require("fs");
-const { URL } = require("url");
 const Hawk = require("hawk");
 const request = require("request-promise-native");
 const program = require("commander");
-const { devCredentials } = require("../lib/constants");
 const packageData = require("../package.json");
 
 let endpointURL = null;
@@ -62,7 +59,7 @@ async function main() {
     formData.notes = program.notes;
   }
 
-  return await request({
+  return request({
     method: "POST",
     url,
     headers: { Authorization },

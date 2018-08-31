@@ -208,7 +208,7 @@ describe("functions/accept.post", () => {
       expect(mocks.putObject.args[0][0]).to.deep.equal({
         Bucket: CONTENT_BUCKET,
         Key: imageKey,
-        Body: new Buffer(imageContent),
+        Body: Buffer.from(imageContent),
         ContentType: imageContentType
       });
       expect(mocks.getQueueUrl.args[0][0]).to.deep.equal({
