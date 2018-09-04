@@ -10,13 +10,13 @@ describe("functions/version.handler", () => {
     process.env.GIT_COMMIT = GIT_COMMIT;
     const result = await version.handler({
       path: "/dev/__version__",
-      httpMethod: "GET"
+      httpMethod: "GET",
     });
     expect(result.statusCode).to.equal(200);
     expect(JSON.parse(result.body)).to.deep.equal({
       commit: GIT_COMMIT,
       version: packageMeta.version,
-      source: packageMeta.repository.url
+      source: packageMeta.repository.url,
     });
   });
 });

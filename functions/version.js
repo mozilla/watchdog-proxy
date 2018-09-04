@@ -9,7 +9,7 @@ module.exports.handler = async function(event, context) {
     body: JSON.stringify({
       commit,
       version: packageMeta.version,
-      source: packageMeta.repository.url
-    })
+      source: packageMeta.repository.url,
+    }),
   };
 };

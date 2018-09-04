@@ -40,15 +40,15 @@ const sendHeartbeatMetrics = async (
 ) => {
   const apiStartTime = Date.now();
   const { QueueUrl } = await SQS.getQueueUrl({
-    QueueName: QUEUE_NAME
+    QueueName: QUEUE_NAME,
   }).promise();
   const attribsResult = await SQS.getQueueAttributes({
     QueueUrl,
     AttributeNames: [
       "ApproximateNumberOfMessages",
       "ApproximateNumberOfMessagesDelayed",
-      "ApproximateNumberOfMessagesNotVisible"
-    ]
+      "ApproximateNumberOfMessagesNotVisible",
+    ],
   }).promise();
   const apiEndTime = Date.now();
   logDebug("SQS.getQueueAttributes duration", apiEndTime - apiStartTime, "ms");
@@ -56,15 +56,14 @@ const sendHeartbeatMetrics = async (
   const {
     ApproximateNumberOfMessages: items_in_queue,
     ApproximateNumberOfMessagesDelayed: items_in_waiting,
-    ApproximateNumberOfMessagesNotVisible: items_in_progress
-  } =
-    attribsResult.Attributes || {};
+    ApproximateNumberOfMessagesNotVisible: items_in_progress,
+  } = attribsResult.Attributes || {};
 
   const pingData = {
     poller_id,
     items_in_queue,
     items_in_progress,
-    items_in_waiting
+    items_in_waiting,
   };
   logDebug("pingData", jsonPretty(pingData));
   return Metrics.pollerHeartbeat(pingData);

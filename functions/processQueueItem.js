@@ -12,7 +12,7 @@ const {
   logInfo,
   jsonPretty,
   wait,
-  epochNow
+  epochNow,
 } = require("../lib/utils.js");
 
 exports.handler = async function({ Records }, context) {
@@ -38,7 +38,7 @@ const emailBody = ({
   requestUrl,
   responseUrl,
   expirationDate,
-  upstreamServiceResponse
+  upstreamServiceResponse,
 }) => `
 Watchdog ID:
 ${id}
@@ -74,7 +74,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     UPSTREAM_SERVICE_KEY,
     EMAIL_FROM,
     EMAIL_TO,
-    EMAIL_EXPIRES
+    EMAIL_EXPIRES,
   } = process.env;
 
   logDebug(
@@ -84,7 +84,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       Bucket,
       EMAIL_FROM,
       EMAIL_TO,
-      EMAIL_EXPIRES
+      EMAIL_EXPIRES,
     })
   );
 
@@ -100,7 +100,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     positive_uri,
     positive_email,
     notes,
-    image
+    image,
   } = parsedBody;
 
   // Start constructing metrics ping data here, so that if there are any
@@ -115,7 +115,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     is_error: false,
     timing_sent: null,
     timing_received: null,
-    timing_submitted: null
+    timing_submitted: null,
   };
 
   logInfo("Processing queue item", id);
@@ -128,7 +128,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         .scan({
           TableName: HITRATE_TABLE,
           FilterExpression: "expiresAt > :now",
-          ExpressionAttributeValues: { ":now": epochNow() }
+          ExpressionAttributeValues: { ":now": epochNow() },
         })
         .promise();
 
@@ -150,8 +150,8 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         Item: {
           id,
           timestamp: epochNow(),
-          expiresAt: epochNow() + Math.floor(RATE_PERIOD / 1000)
-        }
+          expiresAt: epochNow() + Math.floor(RATE_PERIOD / 1000),
+        },
       })
       .promise();
 
@@ -160,7 +160,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     const imageUrl = S3.getSignedUrl("getObject", {
       Bucket,
       Key: image,
-      Expires: 600 // 5 minutes
+      Expires: 600, // 5 minutes
     });
 
     logDebug("imageUrl", imageUrl);
@@ -172,13 +172,13 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       url: `${upstreamServiceUrl}?enhance`,
       headers: {
         "Content-Type": "application/json",
-        "Ocp-Apim-Subscription-Key": UPSTREAM_SERVICE_KEY
+        "Ocp-Apim-Subscription-Key": UPSTREAM_SERVICE_KEY,
       },
       json: true,
       body: {
         DataRepresentation: "URL",
-        Value: imageUrl
-      }
+        Value: imageUrl,
+      },
     });
     metricsPing.timing_received = Date.now() - timingReceivedStart;
     metricsPing.photodna_tracking_id = upstreamServiceResponse.TrackingId;
@@ -192,7 +192,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       // On negative match, clean up the image and request details.
       const deleteResult = await Promise.all([
         S3.deleteObject({ Bucket, Key: `${image}` }).promise(),
-        S3.deleteObject({ Bucket, Key: `${image}-request.json` }).promise()
+        S3.deleteObject({ Bucket, Key: `${image}-request.json` }).promise(),
       ]);
       logDebug("deleteResult", jsonPretty(deleteResult));
     } else {
@@ -209,8 +209,8 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
           positive_email,
           notes,
           image,
-          response: upstreamServiceResponse
-        })
+          response: upstreamServiceResponse,
+        }),
       }).promise();
 
       logDebug("putResult", jsonPretty(putResult));
@@ -228,19 +228,19 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         const imageUrl = S3.getSignedUrl("getObject", {
           Bucket,
           Key: image,
-          Expires: URL_TTL_IN_SEC
+          Expires: URL_TTL_IN_SEC,
         });
 
         const requestUrl = S3.getSignedUrl("getObject", {
           Bucket,
           Key: `${image}-request.json`,
-          Expires: URL_TTL_IN_SEC
+          Expires: URL_TTL_IN_SEC,
         });
 
         const responseUrl = S3.getSignedUrl("getObject", {
           Bucket,
           Key: `${image}-response.json`,
-          Expires: URL_TTL_IN_SEC
+          Expires: URL_TTL_IN_SEC,
         });
 
         const expirationDate = new Date(
@@ -253,7 +253,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
           Message: {
             Subject: {
               Charset: "UTF-8",
-              Data: emailSubject({ id, user })
+              Data: emailSubject({ id, user }),
             },
             Body: {
               Text: {
@@ -267,11 +267,11 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
                   requestUrl,
                   responseUrl,
                   expirationDate,
-                  upstreamServiceResponse
-                })
-              }
-            }
-          }
+                  upstreamServiceResponse,
+                }),
+              },
+            },
+          },
         };
         logDebug("emailParams", jsonPretty(emailParams));
 
@@ -285,15 +285,15 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     const callbackResult = await request.post({
       url: IsMatch ? positive_uri : negative_uri,
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       json: true,
       body: {
         watchdog_id: id,
         positive: upstreamServiceResponse.IsMatch,
         notes,
-        response: upstreamServiceResponse
-      }
+        response: upstreamServiceResponse,
+      },
     });
     metricsPing.timing_submitted = Date.now() - timingSubmittedStart;
     logDebug("callbackResult", jsonPretty(callbackResult));

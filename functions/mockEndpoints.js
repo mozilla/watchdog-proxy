@@ -33,7 +33,7 @@ function response(statusCode, body, headers = {}) {
   return {
     statusCode,
     headers: Object.assign({ "Content-Type": "application/json" }, headers),
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   };
 }
 
@@ -41,16 +41,16 @@ const baseMatchResponse = {
   Status: {
     Code: 3000,
     Description: "OK",
-    Exception: null
+    Exception: null,
   },
   ContentId: null,
   IsMatch: false,
   MatchDetails: {
     AdvancedInfo: [],
-    MatchFlags: []
+    MatchFlags: [],
   },
   XPartnerCustomerId: null,
   TrackingId:
     "WUS_418b5903425346a1b1451821c5cd06ee_57c7457ae3a97812ecf8bde9_ddba296dab39454aa00cf0b17e0eb7bf",
-  EvaluateResponse: null
+  EvaluateResponse: null,
 };

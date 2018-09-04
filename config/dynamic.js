@@ -13,6 +13,6 @@ module.exports = async () => {
   }
 
   return {
-    GIT_COMMIT
+    GIT_COMMIT,
   };
 };

@@ -10,7 +10,7 @@
     "info": "serverless info",
     "lint": "npm-run-all lint:*",
     "lint:js": "eslint .",
-    "prettier": "prettier --write \"{functions,lib,bin}/**/*.js\"",
+    "prettier": "prettier --trailing-comma=es5 --write \"{functions,lib,bin}/**/*.js\"",
     "logs": "serverless logs",
     "postlint": "nsp check -o summary",
     "nsp": "nsp check",
