@@ -7,7 +7,13 @@ const documentClient = new AWS.DynamoDB.DocumentClient();
 const request = require("request-promise-native");
 const { RATE_LIMIT, RATE_PERIOD, RATE_WAIT } = require("../lib/constants");
 const Metrics = require("../lib/metrics");
-const { logDebug, logInfo, jsonPretty } = require("../lib/utils.js");
+const {
+  logDebug,
+  logInfo,
+  jsonPretty,
+  wait,
+  epochNow
+} = require("../lib/utils.js");
 
 exports.handler = async function({ Records }, context) {
   logInfo("Received", Records.length, "messages to process");
@@ -19,9 +25,6 @@ exports.handler = async function({ Records }, context) {
   logInfo("Finished processing batch of", results.length, "messages");
   return results;
 };
-
-const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
-const epochNow = () => Math.floor(Date.now() / 1000);
 
 const emailSubject = ({ id, user }) =>
   `[watchdog-proxy] Positive match for ${user} (${id})`;

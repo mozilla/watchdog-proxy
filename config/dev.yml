@@ -146,6 +146,14 @@ functions:
           path: __heartbeat__
           method: get
 
+  periodicMetrics:
+    timeout: 60
+    handler: functions/periodicMetrics.handler
+    name: ${self:custom.prefix}-periodicMetrics
+    environment: ${self:custom.fnEnv}
+    events:
+      - schedule: rate(1 minute)
+
   accept:
     handler: functions/accept.post
     name: ${self:custom.prefix}-accept

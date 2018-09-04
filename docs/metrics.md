@@ -51,16 +51,14 @@ Example:
 }
 ```
 
-### Queue poller periodic heartbeat
-The `pollQueue` function repeatedly polls the queue for jobs waiting to be
-processed. It gets called every 60 seconds and runs for most of 60 seconds
-before exiting. (This is a hack to work around lacking support for long-running
-functions in Amazon Lambda.)
+### Periodic queue metrics
+The `periodicMetrics` function gets called via CloudWatch alarm every 60
+seconds and runs for most of 60 seconds before exiting. (This is a hack to work
+around lacking support for long-running functions in Amazon Lambda.)
 
-Metrics pings will be sent at these times while the `pollQueue` function is running:
-- when the function starts (every 60 seconds)
-- roughly every 20 seconds while it runs
-- when the function exits (roughly 60 seconds after start)
+Metrics pings will be sent once per second (plus processing time) while the
+function is running. This period is configurable via the `METRICS_PING_PERIOD`
+environment variable during deployment.
 
 The metrics sent in the ping will contain:
 - *event*: "poller_heartbeat": string
