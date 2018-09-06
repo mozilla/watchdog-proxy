@@ -18,7 +18,7 @@ describe("functions/periodicMetrics.handler", () => {
     const getRemainingTimeInMillis = sinon.stub().returns(100);
     const context = {
       awsRequestId: "foo",
-      getRemainingTimeInMillis
+      getRemainingTimeInMillis,
     };
 
     await subject(event, context);
@@ -37,7 +37,7 @@ describe("functions/periodicMetrics.handler", () => {
       .returns(90);
     const context = {
       awsRequestId: "foo",
-      getRemainingTimeInMillis
+      getRemainingTimeInMillis,
     };
 
     await subject(event, context);
@@ -51,7 +51,7 @@ describe("functions/periodicMetrics.handler", () => {
     const {
       ApproximateNumberOfMessages,
       ApproximateNumberOfMessagesDelayed,
-      ApproximateNumberOfMessagesNotVisible
+      ApproximateNumberOfMessagesNotVisible,
     } = constants.QueueAttributes;
 
     expect(postCalls[0][0].body).to.deep.include({
@@ -59,7 +59,7 @@ describe("functions/periodicMetrics.handler", () => {
       poller_id: context.awsRequestId,
       items_in_queue: ApproximateNumberOfMessages,
       items_in_waiting: ApproximateNumberOfMessagesDelayed,
-      items_in_progress: ApproximateNumberOfMessagesNotVisible
+      items_in_progress: ApproximateNumberOfMessagesNotVisible,
     });
   });
 });

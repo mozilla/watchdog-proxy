@@ -43,14 +43,14 @@ async function main() {
     credentials: {
       id: program.id || "devuser",
       key: program.key || "devkey",
-      algorithm: "sha256"
-    }
+      algorithm: "sha256",
+    },
   });
 
   const formData = {
     image: program.image ? fs.createReadStream(program.image) : DEFAULT_IMAGE,
     negative_uri,
-    positive_uri
+    positive_uri,
   };
   if (program.email) {
     formData.positive_email = program.email;
@@ -63,7 +63,7 @@ async function main() {
     method: "POST",
     url,
     headers: { Authorization },
-    formData
+    formData,
   });
 }
 

@@ -8,7 +8,7 @@ const {
   mocks,
   makePromiseFn,
   env: { UPSTREAM_SERVICE_URL, CREDENTIALS_TABLE, QUEUE_NAME, CONTENT_BUCKET },
-  constants: { QueueUrl, requestId }
+  constants: { QueueUrl, requestId },
 } = global;
 
 const Metrics = require("../lib/metrics");
@@ -47,7 +47,7 @@ describe("functions/accept.post", () => {
         path: "/prod/accept",
         id,
         key,
-        algorithm
+        algorithm,
       });
       expectHawkUnauthorized(result);
     });
@@ -66,13 +66,13 @@ describe("functions/accept.post", () => {
         path: "/prod/accept",
         id: badid,
         key,
-        algorithm: DEFAULT_HAWK_ALGORITHM
+        algorithm: DEFAULT_HAWK_ALGORITHM,
       });
 
       expect(mocks.getItem.lastCall.args[0]).to.deep.equal({
         TableName: CREDENTIALS_TABLE,
         Key: { id: badid },
-        AttributesToGet: ["key", "algorithm"]
+        AttributesToGet: ["key", "algorithm"],
       });
       expectHawkUnauthorized(result);
     });
@@ -93,13 +93,13 @@ describe("functions/accept.post", () => {
         path: "/prod/accept",
         id,
         key: badkey,
-        algorithm: DEFAULT_HAWK_ALGORITHM
+        algorithm: DEFAULT_HAWK_ALGORITHM,
       });
 
       expect(mocks.getItem.lastCall.args[0]).to.deep.equal({
         TableName: CREDENTIALS_TABLE,
         Key: { id },
-        AttributesToGet: ["key", "algorithm"]
+        AttributesToGet: ["key", "algorithm"],
       });
       expectHawkUnauthorized(result);
     });
@@ -116,7 +116,7 @@ describe("functions/accept.post", () => {
         path: "/prod/accept",
         id,
         key,
-        algorithm
+        algorithm,
       });
 
       // Dev credentials don't hit the database
@@ -139,13 +139,13 @@ describe("functions/accept.post", () => {
         path: "/prod/accept",
         id,
         key,
-        algorithm
+        algorithm,
       });
 
       expect(mocks.getItem.lastCall.args[0]).to.deep.equal({
         TableName: CREDENTIALS_TABLE,
         Key: { id },
-        AttributesToGet: ["key", "algorithm"]
+        AttributesToGet: ["key", "algorithm"],
       });
       expect(result.statusCode).to.equal(201);
     });
@@ -169,7 +169,7 @@ describe("functions/accept.post", () => {
         id,
         key,
         algorithm,
-        body
+        body,
       });
 
       expect(result.statusCode).to.equal(400);
@@ -187,8 +187,8 @@ describe("functions/accept.post", () => {
         image: {
           filename: "image.jpg",
           contentType: imageContentType,
-          content: imageContent
-        }
+          content: imageContent,
+        },
       });
 
       const result = await acceptPost({
@@ -200,7 +200,7 @@ describe("functions/accept.post", () => {
         id,
         key,
         algorithm,
-        body
+        body,
       });
 
       const imageKey = `image-${requestId}`;
@@ -209,10 +209,10 @@ describe("functions/accept.post", () => {
         Bucket: CONTENT_BUCKET,
         Key: imageKey,
         Body: Buffer.from(imageContent),
-        ContentType: imageContentType
+        ContentType: imageContentType,
       });
       expect(mocks.getQueueUrl.args[0][0]).to.deep.equal({
-        QueueName: QUEUE_NAME
+        QueueName: QUEUE_NAME,
       });
 
       const message = mocks.sendMessage.args[0][0];
@@ -232,14 +232,14 @@ describe("functions/accept.post", () => {
         Bucket: CONTENT_BUCKET,
         Key: `${imageKey}-request.json`,
         Body: message.MessageBody,
-        ContentType: "application/json"
+        ContentType: "application/json",
       });
 
       expect(metricsStub.called).to.be.true;
       expect(metricsStub.args[0][0]).to.deep.include({
         consumer_name: id,
         watchdog_id: requestId,
-        type: imageContentType
+        type: imageContentType,
       });
 
       expect(result.statusCode).to.equal(201);
@@ -255,8 +255,8 @@ const DEFAULT_POST_BODY = {
   image: {
     filename: "image.jpg",
     contentType: "image/jpeg",
-    content: "1234123412341234"
-  }
+    content: "1234123412341234",
+  },
 };
 
 async function acceptPost({
@@ -268,7 +268,7 @@ async function acceptPost({
   id,
   key,
   algorithm,
-  body = DEFAULT_POST_BODY
+  body = DEFAULT_POST_BODY,
 }) {
   const { contentType, encodedBody } = buildBody(body);
   const hawkResult = Hawk.client.header(
@@ -280,7 +280,7 @@ async function acceptPost({
     Host: host,
     "X-Forwarded-Port": port,
     "Content-Type": contentType,
-    Authorization: hawkResult.header
+    Authorization: hawkResult.header,
   };
   return accept.post(
     {
@@ -288,7 +288,7 @@ async function acceptPost({
       httpMethod,
       headers,
       body: encodedBody,
-      requestContext: { path, requestId }
+      requestContext: { path, requestId },
     },
     {}
   );
@@ -321,7 +321,7 @@ function buildBody(data) {
             : encFile(name, value)
       )
       .join("--" + boundary + "\r\n"),
-    `--${boundary}--`
+    `--${boundary}--`,
   ].join("");
 
   return { contentType, encodedBody };

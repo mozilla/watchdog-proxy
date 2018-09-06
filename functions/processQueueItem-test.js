@@ -5,7 +5,7 @@ const {
   makePromiseFn,
   mocks,
   env: { CONTENT_BUCKET, UPSTREAM_SERVICE_URL, UPSTREAM_SERVICE_KEY },
-  constants: { ReceiptHandle }
+  constants: { ReceiptHandle },
 } = global;
 
 const awsRequestId = "test-uuid";
@@ -38,11 +38,11 @@ describe("functions/processQueueItem.handler", () => {
     const deleteCalls = mocks.deleteObject.args;
     expect(deleteCalls[0][0]).to.deep.equal({
       Bucket: CONTENT_BUCKET,
-      Key: `${defaultMessage.image}`
+      Key: `${defaultMessage.image}`,
     });
     expect(deleteCalls[1][0]).to.deep.equal({
       Bucket: CONTENT_BUCKET,
-      Key: `${defaultMessage.image}-request.json`
+      Key: `${defaultMessage.image}-request.json`,
     });
   });
 
@@ -54,7 +54,7 @@ describe("functions/processQueueItem.handler", () => {
       positive_uri,
       positive_email,
       notes,
-      image
+      image,
     } = defaultMessage;
 
     mocks.requestPost
@@ -69,8 +69,8 @@ describe("functions/processQueueItem.handler", () => {
     expect(sendEmailCall).to.deep.include({
       Source: global.env.EMAIL_FROM,
       Destination: {
-        ToAddresses: [defaultMessage.positive_email]
-      }
+        ToAddresses: [defaultMessage.positive_email],
+      },
     });
     [id, user].forEach(v =>
       expect(sendEmailCall.Message.Subject.Data).to.include(v)
@@ -91,7 +91,7 @@ describe("functions/processQueueItem.handler", () => {
       positive_email,
       notes,
       image,
-      response: positiveMatchResponse
+      response: positiveMatchResponse,
     });
   });
 
@@ -147,35 +147,35 @@ describe("functions/processQueueItem.handler", () => {
       {
         Bucket: CONTENT_BUCKET,
         Expires: 600,
-        Key: defaultMessage.image
-      }
+        Key: defaultMessage.image,
+      },
     ]);
 
     expect(mocks.requestPost.args[0][0]).to.deep.equal({
       url: `${UPSTREAM_SERVICE_URL}?enhance`,
       headers: {
         "Content-Type": "application/json",
-        "Ocp-Apim-Subscription-Key": UPSTREAM_SERVICE_KEY
+        "Ocp-Apim-Subscription-Key": UPSTREAM_SERVICE_KEY,
       },
       json: true,
       body: {
         DataRepresentation: "URL",
-        Value: signedImageUrl
-      }
+        Value: signedImageUrl,
+      },
     });
 
     expect(mocks.requestPost.args[1][0]).to.deep.equal({
       url: defaultMessage[positive ? "positive_uri" : "negative_uri"],
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       json: true,
       body: {
         watchdog_id: defaultMessage.id,
         notes: defaultMessage.notes,
         response: positive ? positiveMatchResponse : negativeMatchResponse,
-        positive
-      }
+        positive,
+      },
     });
 
     const response = positive ? positiveMatchResponse : negativeMatchResponse;
@@ -186,7 +186,7 @@ describe("functions/processQueueItem.handler", () => {
       watchdog_id: defaultMessage.id,
       photodna_tracking_id: response.TrackingId,
       is_error: false,
-      is_match: response.IsMatch
+      is_match: response.IsMatch,
     });
     expect(metricsStub.args[0][0]).to.include.keys(
       "timing_sent",
@@ -200,25 +200,25 @@ const negativeMatchResponse = {
   Status: {
     Code: 3000,
     Description: "OK",
-    Exception: null
+    Exception: null,
   },
   ContentId: null,
   IsMatch: false,
   MatchDetails: {
     AdvancedInfo: [],
-    MatchFlags: []
+    MatchFlags: [],
   },
   XPartnerCustomerId: null,
   TrackingId:
     "WUS_418b5903425346a1b1451821c5cd06ee_57c7457ae3a97812ecf8bde9_ddba296dab39454aa00cf0b17e0eb7bf",
-  EvaluateResponse: null
+  EvaluateResponse: null,
 };
 
 const positiveMatchResponse = {
   Status: {
     Code: 3000,
     Description: "OK",
-    Exception: null
+    Exception: null,
   },
   ContentId: null,
   IsMatch: true,
@@ -229,18 +229,18 @@ const positiveMatchResponse = {
         AdvancedInfo: [
           {
             Key: "MatchId",
-            Value: "117721"
-          }
+            Value: "117721",
+          },
         ],
         Source: "Test",
-        Violations: ["A1"]
-      }
-    ]
+        Violations: ["A1"],
+      },
+    ],
   },
   XPartnerCustomerId: null,
   TrackingId:
     "WUS_418b5903425346a1b1451821c5cd06ee_57c7457ae3a97812ecf8bde9_0709e0136ee342e993092edceecbc407",
-  EvaluateResponse: null
+  EvaluateResponse: null,
 };
 
 const defaultMessage = {
@@ -252,7 +252,7 @@ const defaultMessage = {
   positive_uri: "https://example.com/positive?id=123",
   positive_email: "foo@example.com",
   notes: "this is a test",
-  image: "image-8675309"
+  image: "image-8675309",
 };
 
 const makeBody = (message = {}) =>

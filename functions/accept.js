@@ -16,7 +16,7 @@ module.exports.post = async function(event, context) {
   const {
     UPSTREAM_SERVICE_URL,
     QUEUE_NAME: QueueName,
-    CONTENT_BUCKET: Bucket
+    CONTENT_BUCKET: Bucket,
   } = process.env;
 
   logDebug(
@@ -24,14 +24,14 @@ module.exports.post = async function(event, context) {
     jsonPretty({
       UPSTREAM_SERVICE_URL,
       QueueName,
-      Bucket
+      Bucket,
     })
   );
 
   const {
     headers,
     queryStringParameters: params,
-    requestContext: { path, requestId }
+    requestContext: { path, requestId },
   } = event;
 
   logInfo("Accepting job", requestId);
@@ -40,7 +40,7 @@ module.exports.post = async function(event, context) {
   const {
     Host: host,
     Authorization: authorization,
-    "X-Forwarded-Port": port = 80
+    "X-Forwarded-Port": port = 80,
   } = headers;
 
   logDebug("headers", jsonPretty({ host, authorization, port }));
@@ -54,7 +54,7 @@ module.exports.post = async function(event, context) {
         params,
         host,
         port,
-        authorization
+        authorization,
       },
       lookupCredentials
     ));
@@ -89,8 +89,8 @@ module.exports.post = async function(event, context) {
           filename: image.filename,
           contentEncoding: image.contentEncoding,
           contentType: image.contentType,
-          dataMD5: md5(image.data || "")
-        }
+          dataMD5: md5(image.data || ""),
+        },
       })
     );
   } catch (err) {
@@ -121,7 +121,7 @@ module.exports.post = async function(event, context) {
     positive_uri,
     positive_email,
     notes,
-    image: imageKey
+    image: imageKey,
   };
   const MessageBody = JSON.stringify(messageData);
 
@@ -131,7 +131,7 @@ module.exports.post = async function(event, context) {
     Bucket,
     Key: imageKey,
     ContentType: image.contentType,
-    Body: image.data
+    Body: image.data,
   }).promise();
 
   logDebug("imagePutResult", jsonPretty(imagePutResult));
@@ -140,7 +140,7 @@ module.exports.post = async function(event, context) {
     Bucket,
     Key: `${imageKey}-request.json`,
     ContentType: "application/json",
-    Body: MessageBody
+    Body: MessageBody,
   }).promise();
 
   logDebug("requestPutResult", jsonPretty(requestPutResult));
@@ -148,21 +148,21 @@ module.exports.post = async function(event, context) {
   const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
   const queueSendResult = await SQS.sendMessage({
     QueueUrl,
-    MessageBody
+    MessageBody,
   }).promise();
 
   logDebug(
     "queueSendResult",
     jsonPretty({
       QueueUrl,
-      queueSendResult
+      queueSendResult,
     })
   );
 
   const metricsResult = await Metrics.newItem({
     consumer_name: authArtifacts.id,
     watchdog_id: requestId,
-    type: image.contentType
+    type: image.contentType,
   });
 
   logDebug("metricsResult", jsonPretty(metricsResult));
@@ -171,7 +171,7 @@ module.exports.post = async function(event, context) {
     id: requestId,
     negative_uri,
     positive_uri,
-    positive_email
+    positive_email,
   };
 
   logDebug("responseData", jsonPretty(responseData));
@@ -183,7 +183,7 @@ function response(statusCode, body, headers = {}) {
   return {
     statusCode,
     headers: Object.assign({ "Content-Type": "application/json" }, headers),
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   };
 }
 
@@ -199,7 +199,7 @@ function parseRequestBody(event) {
   return new Promise((resolve, reject) => {
     const result = {};
     const busboy = new Busboy({
-      headers: { "content-type": getContentType(event) }
+      headers: { "content-type": getContentType(event) },
     });
     busboy.on(
       "file",
@@ -226,7 +226,7 @@ async function lookupCredentials(id) {
   const {
     ENABLE_DEV_AUTH,
     DISABLE_AUTH_CACHE,
-    CREDENTIALS_TABLE: TableName
+    CREDENTIALS_TABLE: TableName,
   } = process.env;
 
   let out;
@@ -240,14 +240,14 @@ async function lookupCredentials(id) {
       .get({
         TableName,
         Key: { id },
-        AttributesToGet: ["key", "algorithm"]
+        AttributesToGet: ["key", "algorithm"],
       })
       .promise();
     if (!result.Item) {
       out = null;
     } else {
       const {
-        Item: { key, algorithm = DEFAULT_HAWK_ALGORITHM }
+        Item: { key, algorithm = DEFAULT_HAWK_ALGORITHM },
       } = result;
       out = credentialsCache[id] = { id, key, algorithm };
     }
