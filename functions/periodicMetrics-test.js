@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const sinon = require("sinon");
 
-const { resetMocks, mocks, constants } = global;
+const { resetMocks, mocks } = global;
 
 const periodicMetrics = require("./periodicMetrics");
 
@@ -48,18 +48,12 @@ describe("functions/periodicMetrics.handler", () => {
     const postCalls = mocks.requestPost.args;
     expect(postCalls.length).to.equal(1);
 
-    const {
-      ApproximateNumberOfMessages,
-      ApproximateNumberOfMessagesDelayed,
-      ApproximateNumberOfMessagesNotVisible,
-    } = constants.QueueAttributes;
-
     expect(postCalls[0][0].body).to.deep.include({
       event: "poller_heartbeat",
       poller_id: context.awsRequestId,
-      items_in_queue: ApproximateNumberOfMessages,
-      items_in_waiting: ApproximateNumberOfMessagesDelayed,
-      items_in_progress: ApproximateNumberOfMessagesNotVisible,
+      items_in_queue: 200,
+      items_in_progress: 2,
+      items_in_waiting: 20,
     });
   });
 });
