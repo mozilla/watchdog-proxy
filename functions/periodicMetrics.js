@@ -54,16 +54,16 @@ const sendHeartbeatMetrics = async (
   logDebug("SQS.getQueueAttributes duration", apiEndTime - apiStartTime, "ms");
 
   const {
-    ApproximateNumberOfMessages: items_in_queue,
-    ApproximateNumberOfMessagesDelayed: items_in_waiting,
-    ApproximateNumberOfMessagesNotVisible: items_in_progress,
+    ApproximateNumberOfMessages,
+    ApproximateNumberOfMessagesDelayed,
+    ApproximateNumberOfMessagesNotVisible,
   } = attribsResult.Attributes || {};
 
   const pingData = {
     poller_id,
-    items_in_queue,
-    items_in_progress,
-    items_in_waiting,
+    items_in_queue: parseInt(ApproximateNumberOfMessages, 10),
+    items_in_progress: parseInt(ApproximateNumberOfMessagesNotVisible, 10),
+    items_in_waiting: parseInt(ApproximateNumberOfMessagesDelayed, 10),
   };
   logDebug("pingData", jsonPretty(pingData));
   return Metrics.pollerHeartbeat(pingData);
