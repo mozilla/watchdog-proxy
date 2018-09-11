@@ -168,6 +168,7 @@ When using `serverless deploy` to deploy the stack, you can use several environm
 - `MOCK_POSITIVE_CHANCE` - a number from 0.0 to 1.0 representing the probability that the mock upstream endpoint will respond with a positive match
 - `METRICS_URL` - Override for Ping Centre service URL used for internal metrics. By default, the stage or production Ping Centre URL is used based on `NODE_ENV`
 - `METRICS_PING_PERIOD` - Number of milliseconds to wait between periodic metrics pings reporting on queue status (default: 1000)
+- `SENTRY_DSN` - [DSN for use with Sentry error reporting](https://docs.sentry.io/clients/node/config/#environment-variables)
 
 You can see these variables used by scripts defined in `package.json` for development convenience.
 

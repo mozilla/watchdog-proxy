@@ -66,6 +66,7 @@
     "busboy": "0.2.14",
     "eslint-plugin-node": "7.0.1",
     "hawk": "7.0.7",
+    "raven": "2.6.4",
     "request": "2.88.0",
     "request-promise-native": "1.0.5"
   }
