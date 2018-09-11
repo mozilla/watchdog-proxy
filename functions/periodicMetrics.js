@@ -4,9 +4,16 @@ const AWS = require("aws-sdk");
 const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
 const Sentry = require("../lib/sentry");
 const Metrics = require("../lib/metrics");
-const { logDebug, logInfo, jsonPretty, wait } = require("../lib/utils.js");
+const { wait } = require("../lib/utils.js");
 
-module.exports.handler = async function(event, context) {
+module.exports.handler = async function(event = {}, context = {}) {
+  const log = require("../lib/logging")({
+    name: "periodicMetrics",
+    event,
+    context,
+  });
+  log.info("summary");
+
   const Raven = Sentry();
 
   const { DEFAULT_METRICS_PING_PERIOD } = require("../lib/constants");
@@ -17,28 +24,26 @@ module.exports.handler = async function(event, context) {
     parseInt(METRICS_PING_PERIOD, 10) || DEFAULT_METRICS_PING_PERIOD;
 
   let pingCount = 0;
-  logInfo("Periodic metrics monitor start");
+  log.debug("start");
   while (context.getRemainingTimeInMillis() > pingPeriod + 1000) {
     try {
-      await sendHeartbeatMetrics(process.env, context);
+      await sendHeartbeatMetrics(log, process.env, context);
       pingCount++;
     } catch (err) {
       Raven.captureException(err);
-      logInfo("Failed to send periodic metrics", err);
+      log.error("error", { err });
     }
-    logDebug(
-      "Pausing for",
+    log.verbose("pause", {
       pingPeriod,
-      "ms",
-      context.getRemainingTimeInMillis(),
-      "ms remaining"
-    );
+      remaining: context.getRemainingTimeInMillis(),
+    });
     await wait(pingPeriod);
   }
-  logInfo(`Periodic metrics monitor exit, pingCount=${pingCount}`);
+  log.verbose("exit", { pingCount });
 };
 
 const sendHeartbeatMetrics = async (
+  log,
   { QUEUE_NAME },
   { awsRequestId: poller_id }
 ) => {
@@ -55,7 +60,9 @@ const sendHeartbeatMetrics = async (
     ],
   }).promise();
   const apiEndTime = Date.now();
-  logDebug("SQS.getQueueAttributes duration", apiEndTime - apiStartTime, "ms");
+  log.debug("getQueueAttributesDuration", {
+    duration: apiEndTime - apiStartTime,
+  });
 
   const {
     ApproximateNumberOfMessages,
@@ -69,6 +76,6 @@ const sendHeartbeatMetrics = async (
     items_in_progress: parseInt(ApproximateNumberOfMessagesNotVisible, 10),
     items_in_waiting: parseInt(ApproximateNumberOfMessagesDelayed, 10),
   };
-  logDebug("pingData", jsonPretty(pingData));
+  log.debug("pingData", { pingData });
   return Metrics.pollerHeartbeat(pingData);
 };

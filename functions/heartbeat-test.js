@@ -8,6 +8,7 @@ describe("functions/heartbeat.handler", () => {
     const result = await heartbeat.handler({
       path: "/dev/__heartbeat__",
       httpMethod: "GET",
+      headers: {},
     });
     expect(result.statusCode).to.equal(200);
     expect(JSON.parse(result.body)).to.deep.equal({ status: "OK" });

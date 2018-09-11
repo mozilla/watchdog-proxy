@@ -8,22 +8,24 @@ const request = require("request-promise-native");
 const { RATE_LIMIT, RATE_PERIOD, RATE_WAIT } = require("../lib/constants");
 const Sentry = require("../lib/sentry");
 const Metrics = require("../lib/metrics");
-const {
-  logDebug,
-  logInfo,
-  jsonPretty,
-  wait,
-  epochNow,
-} = require("../lib/utils.js");
+const { wait, epochNow } = require("../lib/utils.js");
 
-exports.handler = async function({ Records }, context) {
-  logInfo("Received", Records.length, "messages to process");
+exports.handler = async function(event = {}, context = {}) {
+  const { Records } = event;
+  const log = require("../lib/logging")({
+    name: "processQueueItem",
+    event,
+    context,
+  });
+  log.info("summary", { recordCount: Records.length });
+
   const results = [];
   for (let idx = 0; idx < Records.length; idx++) {
     const result = await exports.handleOne(Records[idx], context);
     results.push(result);
   }
-  logInfo("Finished processing batch of", results.length, "messages");
+
+  log.debug("done", { resultCount: results.length });
   return results;
 };
 
@@ -68,7 +70,17 @@ Response JSON:
 ${responseUrl}
 `;
 
-exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
+exports.handleOne = async function(event, context) {
+  const log = require("../lib/logging")({
+    name: "processQueueItem.worker",
+    event,
+    context,
+  });
+  log.info("summary");
+
+  const { body } = event;
+  const { awsRequestId } = context;
+
   const {
     HITRATE_TABLE,
     CONTENT_BUCKET: Bucket,
@@ -80,19 +92,16 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
 
   const Raven = Sentry();
 
-  logDebug(
-    "env",
-    jsonPretty({
-      HITRATE_TABLE,
-      Bucket,
-      EMAIL_FROM,
-      EMAIL_TO,
-      EMAIL_EXPIRES,
-    })
-  );
+  log.verbose("env", {
+    HITRATE_TABLE,
+    Bucket,
+    EMAIL_FROM,
+    EMAIL_TO,
+    EMAIL_EXPIRES,
+  });
 
   const parsedBody = JSON.parse(body);
-  logDebug("parsedBody", jsonPretty(parsedBody));
+  log.verbose("parsedBody", { parsedBody });
 
   const {
     datestamp,
@@ -121,7 +130,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     timing_submitted: null,
   };
 
-  logInfo("Processing queue item", id);
+  log.info("processing", { id });
 
   try {
     // Pause if we're at the rate limit for current expiration window
@@ -135,10 +144,10 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         })
         .promise();
 
-      logDebug("hitRateData", jsonPretty(data));
+      log.verbose("hitRateData", { data });
 
       if (data.Count >= RATE_LIMIT) {
-        logInfo("Pausing for rate limit", epochNow());
+        log.info("pausing");
         rateLimited = true;
         await wait(RATE_WAIT);
       } else {
@@ -158,7 +167,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       })
       .promise();
 
-    logDebug("hitRatePutResult", jsonPretty(hitRatePutResult));
+    log.verbose("hitRatePutResult", { hitRatePutResult });
 
     const imageUrl = S3.getSignedUrl("getObject", {
       Bucket,
@@ -166,7 +175,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       Expires: 600, // 5 minutes
     });
 
-    logDebug("imageUrl", imageUrl);
+    log.verbose("imageUrl", { imageUrl });
 
     metricsPing.timing_sent = Date.now() - Date.parse(datestamp);
 
@@ -186,7 +195,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     metricsPing.timing_received = Date.now() - timingReceivedStart;
     metricsPing.photodna_tracking_id = upstreamServiceResponse.TrackingId;
 
-    logDebug("upstreamServiceResponse", jsonPretty(upstreamServiceResponse));
+    log.verbose("upstreamServiceResponse", { upstreamServiceResponse });
 
     const { IsMatch } = upstreamServiceResponse;
     metricsPing.is_match = IsMatch;
@@ -197,7 +206,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         S3.deleteObject({ Bucket, Key: `${image}` }).promise(),
         S3.deleteObject({ Bucket, Key: `${image}-request.json` }).promise(),
       ]);
-      logDebug("deleteResult", jsonPretty(deleteResult));
+      log.verbose("deleteResult", { deleteResult });
     } else {
       // On positive match, store the details of the match response.
       const putResult = await S3.putObject({
@@ -216,7 +225,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         }),
       }).promise();
 
-      logDebug("putResult", jsonPretty(putResult));
+      log.verbose("putResult", { putResult });
 
       // Send an email alert on positive match, if addresses are available.
       const ToAddresses = [];
@@ -276,11 +285,11 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
             },
           },
         };
-        logDebug("emailParams", jsonPretty(emailParams));
+        log.verbose("emailParams", { emailParams });
 
         const emailResult = await SES.sendEmail(emailParams).promise();
-        logDebug("emailResult", jsonPretty(emailResult));
-        logInfo(`Sent notification email (${emailResult.MessageId})`);
+        log.verbose("emailResult", { emailResult });
+        log.info("sentEmail", { messageId: emailResult.MessageId });
       }
     }
 
@@ -304,15 +313,15 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
       },
     });
     metricsPing.timing_submitted = Date.now() - timingSubmittedStart;
-    logDebug("callbackResult", jsonPretty(callbackResult));
+    log.verbose("callbackResult", { callbackResult });
   } catch (err) {
     Raven.captureException(err);
     metricsPing.is_error = true;
-    logInfo("REQUEST ERROR", err);
+    log.error("callbackError", { err });
     throw err;
   }
 
   const metricsResult = await Metrics.workerWorks(metricsPing);
-  logDebug("metricsResult", jsonPretty(metricsResult));
+  log.verbose("metricsResult", { metricsResult });
   return id;
 };
