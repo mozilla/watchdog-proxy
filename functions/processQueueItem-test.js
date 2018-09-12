@@ -95,6 +95,15 @@ describe("functions/processQueueItem.handler", () => {
     });
   });
 
+  it("flags an error on non-3000 status from upstream service", async () => {
+    mocks.requestPost
+      .onCall(0)
+      .resolves(errorMatchResponse)
+      .onCall(1)
+      .resolves({});
+    await expectCommonItemProcessed(false, true);
+  });
+
   it("pauses for rate limiting", async () => {
     // Mock the hitrate table, but only the first three should matter.
     mocks.scanItems
@@ -120,7 +129,7 @@ describe("functions/processQueueItem.handler", () => {
     expect(scanCalls.length).to.equal(3);
   });
 
-  const expectCommonItemProcessed = async positive => {
+  const expectCommonItemProcessed = async (positive, error = false) => {
     const body = makeBody();
     const signedImageUrl = "https://example.s3.amazonaws.com/some-image";
     const signedRequestUrl = "https://example.s3.amazonaws.com/some-request";
@@ -164,6 +173,15 @@ describe("functions/processQueueItem.handler", () => {
       },
     });
 
+    let upstreamResponse;
+    if (error) {
+      upstreamResponse = errorMatchResponse;
+    } else if (positive) {
+      upstreamResponse = positiveMatchResponse;
+    } else {
+      upstreamResponse = negativeMatchResponse;
+    }
+
     expect(mocks.requestPost.args[1][0]).to.deep.equal({
       url: defaultMessage[positive ? "positive_uri" : "negative_uri"],
       headers: {
@@ -171,9 +189,10 @@ describe("functions/processQueueItem.handler", () => {
       },
       json: true,
       body: {
+        error,
         watchdog_id: defaultMessage.id,
         notes: defaultMessage.notes,
-        response: positive ? positiveMatchResponse : negativeMatchResponse,
+        response: upstreamResponse,
         positive,
       },
     });
@@ -213,6 +232,14 @@ const negativeMatchResponse = {
     "WUS_418b5903425346a1b1451821c5cd06ee_57c7457ae3a97812ecf8bde9_ddba296dab39454aa00cf0b17e0eb7bf",
   EvaluateResponse: null,
 };
+
+const errorMatchResponse = Object.assign({}, negativeMatchResponse, {
+  Status: {
+    Code: 3208,
+    Description: "image too large",
+    Exception: null,
+  },
+});
 
 const positiveMatchResponse = {
   Status: {

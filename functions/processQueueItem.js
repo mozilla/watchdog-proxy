@@ -285,6 +285,10 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     }
 
     const timingSubmittedStart = Date.now();
+    const upstreamIsError =
+      !upstreamServiceResponse ||
+      !upstreamServiceResponse.Status ||
+      upstreamServiceResponse.Status.Code !== 3000;
     const callbackResult = await request.post({
       url: IsMatch ? positive_uri : negative_uri,
       headers: {
@@ -295,6 +299,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
         watchdog_id: id,
         positive: upstreamServiceResponse.IsMatch,
         notes,
+        error: upstreamIsError,
         response: upstreamServiceResponse,
       },
     });
