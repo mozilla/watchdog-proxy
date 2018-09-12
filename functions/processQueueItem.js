@@ -6,6 +6,7 @@ const SES = new AWS.SES({ apiVersion: "2010-12-01" });
 const documentClient = new AWS.DynamoDB.DocumentClient();
 const request = require("request-promise-native");
 const { RATE_LIMIT, RATE_PERIOD, RATE_WAIT } = require("../lib/constants");
+const Sentry = require("../lib/sentry");
 const Metrics = require("../lib/metrics");
 const {
   logDebug,
@@ -76,6 +77,8 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     EMAIL_TO,
     EMAIL_EXPIRES,
   } = process.env;
+
+  const Raven = Sentry();
 
   logDebug(
     "env",
@@ -298,6 +301,7 @@ exports.handleOne = async function({ receiptHandle, body }, { awsRequestId }) {
     metricsPing.timing_submitted = Date.now() - timingSubmittedStart;
     logDebug("callbackResult", jsonPretty(callbackResult));
   } catch (err) {
+    Raven.captureException(err);
     metricsPing.is_error = true;
     logInfo("REQUEST ERROR", err);
     throw err;

@@ -38,6 +38,8 @@ custom:
       EMAIL_EXPIRES: ${env:EMAIL_EXPIRATION,"2592000"}
       MOCK_POSITIVE_CHANCE: ${env:MOCK_POSITIVE_CHANCE,"0.1"}
       METRICS_PING_PERIOD: ${env:METRICS_PING_PERIOD,"1000"}
+      SENTRY_DSN: ${env:SENTRY_DSN,""}
+      SENTRY_RELEASE: ${env:SENTRY_RELEASE,env:GIT_COMMIT,self:custom.dynamicConfig.GIT_COMMIT}
 
 provider:
   name: aws

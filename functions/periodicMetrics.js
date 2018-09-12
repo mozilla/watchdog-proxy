@@ -2,10 +2,13 @@
 
 const AWS = require("aws-sdk");
 const SQS = new AWS.SQS({ apiVersion: "2012-11-05" });
+const Sentry = require("../lib/sentry");
 const Metrics = require("../lib/metrics");
 const { logDebug, logInfo, jsonPretty, wait } = require("../lib/utils.js");
 
 module.exports.handler = async function(event, context) {
+  const Raven = Sentry();
+
   const { DEFAULT_METRICS_PING_PERIOD } = require("../lib/constants");
 
   const { METRICS_PING_PERIOD } = process.env;
@@ -20,6 +23,7 @@ module.exports.handler = async function(event, context) {
       await sendHeartbeatMetrics(process.env, context);
       pingCount++;
     } catch (err) {
+      Raven.captureException(err);
       logInfo("Failed to send periodic metrics", err);
     }
     logDebug(
