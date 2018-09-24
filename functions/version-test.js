@@ -11,6 +11,7 @@ describe("functions/version.handler", () => {
     const result = await version.handler({
       path: "/dev/__version__",
       httpMethod: "GET",
+      headers: {},
     });
     expect(result.statusCode).to.equal(200);
     expect(JSON.parse(result.body)).to.deep.equal({

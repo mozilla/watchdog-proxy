@@ -9,11 +9,19 @@ const documentClient = new AWS.DynamoDB.DocumentClient();
 const { DEV_CREDENTIALS, DEFAULT_HAWK_ALGORITHM } = require("../lib/constants");
 const Sentry = require("../lib/sentry");
 const Metrics = require("../lib/metrics");
-const { logDebug, logInfo, jsonPretty, md5 } = require("../lib/utils.js");
+const { md5 } = require("../lib/utils.js");
 
 const REQUIRED_FIELDS = ["image", "negative_uri", "positive_uri"];
 
 module.exports.post = async function(event, context) {
+  const log = require("../lib/logging")({
+    name: "accept",
+    isRequest: true,
+    event,
+    context,
+  });
+  log.info("summary");
+
   const {
     UPSTREAM_SERVICE_URL,
     QUEUE_NAME: QueueName,
@@ -21,15 +29,11 @@ module.exports.post = async function(event, context) {
   } = process.env;
 
   const Raven = Sentry();
-
-  logDebug(
-    "env",
-    jsonPretty({
-      UPSTREAM_SERVICE_URL,
-      QueueName,
-      Bucket,
-    })
-  );
+  log.verbose("env", {
+    UPSTREAM_SERVICE_URL,
+    QueueName,
+    Bucket,
+  });
 
   const {
     headers,
@@ -37,16 +41,13 @@ module.exports.post = async function(event, context) {
     requestContext: { path, requestId },
   } = event;
 
-  logInfo("Accepting job", requestId);
-  logDebug("event", jsonPretty({ headers, params, path, requestId }));
+  log.verbose("event", { headers, params, path, requestId });
 
   const {
     Host: host,
     Authorization: authorization,
     "X-Forwarded-Port": port = 80,
   } = headers;
-
-  logDebug("headers", jsonPretty({ host, authorization, port }));
 
   let authArtifacts;
   try {
@@ -61,9 +62,10 @@ module.exports.post = async function(event, context) {
       },
       lookupCredentials
     ));
-    logDebug("auth", jsonPretty({ authArtifacts }));
+    log.commonFields.uid = authArtifacts.id;
   } catch (err) {
     Raven.captureException(err);
+    log.error("authInvalid", { authorization });
     return response(
       401,
       { error: err.message },
@@ -76,35 +78,31 @@ module.exports.post = async function(event, context) {
     body = await parseRequestBody(event);
     REQUIRED_FIELDS.forEach(name => {
       if (!body[name]) {
+        log.warn("requestInvalid", { field: name });
         throw { message: `Required "${name}" is missing` };
       }
     });
     // TODO: More input validation here?
     ({ negative_uri, positive_uri, positive_email, notes, image } = body);
 
-    logDebug(
-      "body",
-      jsonPretty({
-        negative_uri,
-        positive_uri,
-        positive_email,
-        notes,
-        image: {
-          filename: image.filename,
-          contentEncoding: image.contentEncoding,
-          contentType: image.contentType,
-          dataMD5: md5(image.data || ""),
-        },
-      })
-    );
+    log.debug("body", {
+      negative_uri,
+      positive_uri,
+      positive_email,
+      notes,
+      image: {
+        filename: image.filename,
+        contentEncoding: image.contentEncoding,
+        contentType: image.contentType,
+        dataMD5: md5(image.data || ""),
+      },
+    });
   } catch (err) {
     Raven.captureException(err);
     return response(400, { error: err.message });
   }
 
   const imageKey = `image-${requestId}`;
-
-  logDebug("imageKey", imageKey);
 
   const upstreamServiceUrl =
     UPSTREAM_SERVICE_URL !== "__MOCK__"
@@ -114,8 +112,6 @@ module.exports.post = async function(event, context) {
         "/" +
         event.requestContext.stage +
         "/mock/upstream";
-
-  logDebug("upstreamServiceUrl", upstreamServiceUrl);
 
   const messageData = {
     datestamp: new Date().toISOString(),
@@ -128,9 +124,9 @@ module.exports.post = async function(event, context) {
     notes,
     image: imageKey,
   };
-  const MessageBody = JSON.stringify(messageData);
+  log.verbose("enqueue", messageData);
 
-  logDebug("MessageBody", MessageBody);
+  const MessageBody = JSON.stringify(messageData);
 
   const imagePutResult = await S3.putObject({
     Bucket,
@@ -139,7 +135,7 @@ module.exports.post = async function(event, context) {
     Body: image.data,
   }).promise();
 
-  logDebug("imagePutResult", jsonPretty(imagePutResult));
+  log.verbose("imagePutResult", { imagePutResult });
 
   const requestPutResult = await S3.putObject({
     Bucket,
@@ -148,7 +144,7 @@ module.exports.post = async function(event, context) {
     Body: MessageBody,
   }).promise();
 
-  logDebug("requestPutResult", jsonPretty(requestPutResult));
+  log.verbose("requestPutResult", { requestPutResult });
 
   const { QueueUrl } = await SQS.getQueueUrl({ QueueName }).promise();
   const queueSendResult = await SQS.sendMessage({
@@ -156,13 +152,7 @@ module.exports.post = async function(event, context) {
     MessageBody,
   }).promise();
 
-  logDebug(
-    "queueSendResult",
-    jsonPretty({
-      QueueUrl,
-      queueSendResult,
-    })
-  );
+  log.verbose("queueSendResult", { QueueUrl, queueSendResult });
 
   const metricsResult = await Metrics.newItem({
     consumer_name: authArtifacts.id,
@@ -170,7 +160,7 @@ module.exports.post = async function(event, context) {
     type: image.contentType,
   });
 
-  logDebug("metricsResult", jsonPretty(metricsResult));
+  log.verbose("metricsResult", { metricsResult });
 
   const responseData = {
     id: requestId,
@@ -178,9 +168,7 @@ module.exports.post = async function(event, context) {
     positive_uri,
     positive_email,
   };
-
-  logDebug("responseData", jsonPretty(responseData));
-
+  log.info("response", responseData);
   return response(201, responseData);
 };
 
