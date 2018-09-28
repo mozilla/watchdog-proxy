@@ -20,7 +20,6 @@ module.exports.post = async function(event, context) {
     event,
     context,
   });
-  log.info("summary");
 
   const {
     UPSTREAM_SERVICE_URL,
@@ -65,7 +64,7 @@ module.exports.post = async function(event, context) {
     log.commonFields.uid = authArtifacts.id;
   } catch (err) {
     Raven.captureException(err);
-    log.error("authInvalid", { authorization });
+    log.error("authInvalid", { authorization, error: err.message });
     return response(
       401,
       { error: err.message },
@@ -168,7 +167,7 @@ module.exports.post = async function(event, context) {
     positive_uri,
     positive_email,
   };
-  log.info("response", responseData);
+  log.info("summary", responseData);
   return response(201, responseData);
 };
 
