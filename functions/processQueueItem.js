@@ -17,7 +17,6 @@ exports.handler = async function(event = {}, context = {}) {
     event,
     context,
   });
-  log.info("summary", { recordCount: Records.length });
 
   const results = [];
   for (let idx = 0; idx < Records.length; idx++) {
@@ -26,6 +25,7 @@ exports.handler = async function(event = {}, context = {}) {
   }
 
   log.debug("done", { resultCount: results.length });
+  log.info("summary", { recordCount: Records.length });
   return results;
 };
 

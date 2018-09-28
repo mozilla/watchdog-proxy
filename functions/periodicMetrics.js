@@ -12,7 +12,6 @@ module.exports.handler = async function(event = {}, context = {}) {
     event,
     context,
   });
-  log.info("summary");
 
   const Raven = Sentry();
 
@@ -40,6 +39,7 @@ module.exports.handler = async function(event = {}, context = {}) {
     await wait(pingPeriod);
   }
   log.verbose("exit", { pingCount });
+  log.info("summary");
 };
 
 const sendHeartbeatMetrics = async (
