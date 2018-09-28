@@ -13,6 +13,8 @@ const { md5 } = require("../lib/utils.js");
 
 const REQUIRED_FIELDS = ["image", "negative_uri", "positive_uri"];
 
+const Raven = Sentry();
+
 module.exports.post = async function(event, context) {
   const log = require("../lib/logging")({
     name: "accept",
@@ -27,7 +29,6 @@ module.exports.post = async function(event, context) {
     CONTENT_BUCKET: Bucket,
   } = process.env;
 
-  const Raven = Sentry();
   log.verbose("env", {
     UPSTREAM_SERVICE_URL,
     QueueName,

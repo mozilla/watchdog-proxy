@@ -10,6 +10,8 @@ const Sentry = require("../lib/sentry");
 const Metrics = require("../lib/metrics");
 const { wait, epochNow } = require("../lib/utils.js");
 
+const Raven = Sentry();
+
 exports.handler = async function(event = {}, context = {}) {
   const { Records } = event;
   const log = require("../lib/logging")({
@@ -89,8 +91,6 @@ exports.handleOne = async function(event, context) {
     EMAIL_TO,
     EMAIL_EXPIRES,
   } = process.env;
-
-  const Raven = Sentry();
 
   log.verbose("env", {
     HITRATE_TABLE,
