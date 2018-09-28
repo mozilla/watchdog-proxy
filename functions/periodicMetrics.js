@@ -6,14 +6,14 @@ const Sentry = require("../lib/sentry");
 const Metrics = require("../lib/metrics");
 const { wait } = require("../lib/utils.js");
 
+const Raven = Sentry();
+
 module.exports.handler = async function(event = {}, context = {}) {
   const log = require("../lib/logging")({
     name: "periodicMetrics",
     event,
     context,
   });
-
-  const Raven = Sentry();
 
   const { DEFAULT_METRICS_PING_PERIOD } = require("../lib/constants");
 
